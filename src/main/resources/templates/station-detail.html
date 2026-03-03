@@ -215,29 +215,8 @@
                 return;
             }
             
-            // 批量加载所有充电桩的充电枪（并行请求）
-            const pileIds = station.piles.map(pile => pile.id);
-            Promise.all(pileIds.map(pileId => loadPileGuns(pileId)))
-                .then(pilesWithGuns => {
-                    renderPiles(pilesWithGuns);
-                })
-                .catch(error => {
-                    console.error('加载充电枪失败:', error);
-                    // 降级处理：只显示充电桩信息
-                    renderPiles(station.piles.map(pile => ({...pile, guns: []})));
-                });
-        }
-        
-        // 加载充电桩的充电枪（优化：直接返回数据，不需要额外处理）
-        function loadPileGuns(pileId) {
-            return fetch('/api/piles/' + pileId)
-                .then(response => response.json())
-                .then(result => {
-                    if (result.code === 200) {
-                        return result.data;
-                    }
-                    throw new Error('加载失败');
-                });
+            // 直接渲染充电桩（已包含充电枪信息）
+            renderPiles(station.piles);
         }
         
         // 渲染充电桩列表

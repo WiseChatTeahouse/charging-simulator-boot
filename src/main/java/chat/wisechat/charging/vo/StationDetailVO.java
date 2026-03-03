@@ -23,5 +23,5 @@ public class StationDetailVO {
     
     private String statusText;
     
-    private List<ChargingPileVO> piles;
+    private List<ChargingPileDetailVO> piles;
 }

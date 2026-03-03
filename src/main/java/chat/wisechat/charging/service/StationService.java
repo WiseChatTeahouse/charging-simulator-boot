@@ -68,7 +68,7 @@ public class StationService {
     }
     
     /**
-     * 查询站点详情（包含充电桩）
+     * 查询站点详情（包含充电桩和充电枪）
      */
     public StationDetailVO getStationDetail(Long stationId) {
         String cacheKey = "station:detail:" + stationId;
@@ -94,9 +94,28 @@ public class StationService {
                         .eq(ChargingPile::getStationId, stationId)
         );
         
-        vo.setPiles(piles.stream()
-                .map(this::convertToChargingPileVO)
-                .collect(Collectors.toList()));
+        // 为每个充电桩查询充电枪并转换为ChargingPileDetailVO
+        List<ChargingPileDetailVO> pileDetails = piles.stream()
+                .map(pile -> {
+                    ChargingPileDetailVO pileVO = new ChargingPileDetailVO();
+                    BeanUtils.copyProperties(pile, pileVO);
+                    pileVO.setStatusText(getPileStatusText(pile.getStatus()));
+                    
+                    // 查询该充电桩的充电枪
+                    List<ChargingGun> guns = gunMapper.selectList(
+                            new LambdaQueryWrapper<ChargingGun>()
+                                    .eq(ChargingGun::getPileId, pile.getId())
+                    );
+                    
+                    pileVO.setGuns(guns.stream()
+                            .map(this::convertToChargingGunVO)
+                            .collect(Collectors.toList()));
+                    
+                    return pileVO;
+                })
+                .collect(Collectors.toList());
+        
+        vo.setPiles(pileDetails);
         
         cache.put(cacheKey, vo);
         return vo;
