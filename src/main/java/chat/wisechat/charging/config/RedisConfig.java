@@ -1,5 +1,6 @@
 package chat.wisechat.charging.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -26,8 +27,12 @@ public class RedisConfig {
         template.setKeySerializer(stringSerializer);
         template.setHashKeySerializer(stringSerializer);
         
+        // 创建自定义 ObjectMapper 并注册 JavaTimeModule
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.findAndRegisterModules();
+        
         // 使用 JSON 序列化器
-        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer();
+        GenericJackson2JsonRedisSerializer jsonSerializer = new GenericJackson2JsonRedisSerializer(objectMapper);
         template.setValueSerializer(jsonSerializer);
         template.setHashValueSerializer(jsonSerializer);
         

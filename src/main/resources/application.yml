@@ -29,7 +29,7 @@ mqtt:
   broker-url: tcp://localhost:1883
   client-id: charging-simulator-${random.value}
   username: admin
-  password: admin
+  password: admin123
   topics:
     charging-data: charging/+/pile/+/gun/+/data
     bms-data: vehicle/+/bms/data
