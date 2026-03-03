@@ -253,6 +253,48 @@ public class ChargingService {
     }
     
     /**
+     * 根据充电枪ID获取活跃会话
+     */
+    public ChargingSessionVO getActiveSessionByGunId(Long gunId) {
+        log.info("查询充电枪活跃会话: gunId={}", gunId);
+        
+        // 首先从Redis缓存查询
+        String gunSessionKey = "gun:session:" + gunId;
+        Object cachedSessionId = redisTemplate.opsForValue().get(gunSessionKey);
+        
+        if (cachedSessionId != null) {
+            Long sessionId = Long.parseLong(cachedSessionId.toString());
+            try {
+                return getSessionStatus(sessionId);
+            } catch (BusinessException e) {
+                // 缓存的会话不存在，继续从数据库查询
+                log.warn("缓存的会话不存在: sessionId={}", sessionId);
+            }
+        }
+        
+        // 从数据库查询活跃会话（status=0或1）
+        ChargingSession session = sessionMapper.selectOne(
+                new LambdaQueryWrapper<ChargingSession>()
+                        .eq(ChargingSession::getGunId, gunId)
+                        .in(ChargingSession::getStatus, 0, 1)
+                        .orderByDesc(ChargingSession::getId)
+                        .last("LIMIT 1")
+        );
+        
+        if (session == null) {
+            log.debug("充电枪 {} 没有活跃会话", gunId);
+            return null;
+        }
+        
+        // 更新缓存
+        if (session.getStatus() == 1) {
+            redisTemplate.opsForValue().set(gunSessionKey, session.getId(), 30, TimeUnit.MINUTES);
+        }
+        
+        return convertToVO(session);
+    }
+    
+    /**
      * 重置充电枪状态
      */
     @Transactional(rollbackFor = Exception.class)
@@ -304,4 +346,47 @@ public class ChargingService {
         
         log.info("充电枪状态重置成功");
     }
+
+    /**
+     * 根据充电枪ID获取活跃会话
+     */
+    public ChargingSessionVO getActiveSessionByGunId(Long gunId) {
+        log.info("查询充电枪活跃会话: gunId={}", gunId);
+
+        // 首先从Redis缓存查询
+        String gunSessionKey = "gun:session:" + gunId;
+        Object cachedSessionId = redisTemplate.opsForValue().get(gunSessionKey);
+
+        if (cachedSessionId != null) {
+            Long sessionId = Long.parseLong(cachedSessionId.toString());
+            try {
+                return getSessionStatus(sessionId);
+            } catch (BusinessException e) {
+                // 缓存的会话不存在，继续从数据库查询
+                log.warn("缓存的会话不存在: sessionId={}", sessionId);
+            }
+        }
+
+        // 从数据库查询活跃会话（status=0或1）
+        ChargingSession session = sessionMapper.selectOne(
+                new LambdaQueryWrapper<ChargingSession>()
+                        .eq(ChargingSession::getGunId, gunId)
+                        .in(ChargingSession::getStatus, 0, 1)
+                        .orderByDesc(ChargingSession::getId)
+                        .last("LIMIT 1")
+        );
+
+        if (session == null) {
+            log.debug("充电枪 {} 没有活跃会话", gunId);
+            return null;
+        }
+
+        // 更新缓存
+        if (session.getStatus() == 1) {
+            redisTemplate.opsForValue().set(gunSessionKey, session.getId(), 30, TimeUnit.MINUTES);
+        }
+
+        return convertToVO(session);
+    }
+
 }

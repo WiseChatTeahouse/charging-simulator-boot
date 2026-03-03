@@ -106,6 +106,21 @@ public class ChargingController {
     }
     
     /**
+     * 根据充电枪ID获取活跃会话
+     */
+    @GetMapping("/active-session")
+    public Result<ChargingSessionVO> getActiveSession(@RequestParam Long gunId) {
+        log.info("查询充电枪活跃会话: gunId={}", gunId);
+        
+        if (gunId == null || gunId <= 0) {
+            return Result.error("充电枪ID无效");
+        }
+        
+        ChargingSessionVO session = chargingService.getActiveSessionByGunId(gunId);
+        return Result.success(session);
+    }
+    
+    /**
      * 重置充电枪状态
      */
     @PostMapping("/reset")

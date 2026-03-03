@@ -314,7 +314,68 @@
         window.onload = function() {
             loadGunInfo();
             initButtons();
+            checkAndRestoreActiveSession();
         };
+        
+        // 检查并恢复活跃会话
+        function checkAndRestoreActiveSession() {
+            fetch('/api/charging/active-session?gunId=' + gunId)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 200 && result.data) {
+                        const sessionData = result.data;
+                        console.log('发现活跃会话:', sessionData);
+                        restoreSessionState(sessionData);
+                    } else {
+                        console.log('没有活跃会话');
+                    }
+                })
+                .catch(error => {
+                    console.error('查询活跃会话失败:', error);
+                });
+        }
+        
+        // 恢复会话状态
+        function restoreSessionState(sessionData) {
+            // 设置sessionId
+            sessionId = sessionData.id;
+            
+            // 根据会话状态更新UI
+            const status = sessionData.status;
+            const statusText = sessionData.statusText;
+            
+            document.getElementById('gun-status').textContent = statusText;
+            
+            if (status === 0) {
+                // 已插枪状态
+                document.getElementById('btn-insert-gun').disabled = true;
+                document.getElementById('btn-start-charging').disabled = false;
+                document.getElementById('btn-stop-charging').disabled = true;
+                document.getElementById('btn-remove-gun').disabled = true;
+                showStatus('检测到已插枪状态，会话ID: ' + sessionId);
+            } else if (status === 1) {
+                // 充电中状态
+                document.getElementById('btn-insert-gun').disabled = true;
+                document.getElementById('btn-start-charging').disabled = true;
+                document.getElementById('btn-stop-charging').disabled = false;
+                document.getElementById('btn-remove-gun').disabled = true;
+                
+                // 右侧面板变为正常显示
+                document.getElementById('vehicle-panel').classList.remove('grayed-out');
+                
+                showStatus('检测到充电中状态，正在恢复连接...');
+                
+                // 自动建立WebSocket连接
+                connectWebSocket();
+            } else if (status === 2) {
+                // 已结束状态
+                document.getElementById('btn-insert-gun').disabled = true;
+                document.getElementById('btn-start-charging').disabled = true;
+                document.getElementById('btn-stop-charging').disabled = true;
+                document.getElementById('btn-remove-gun').disabled = false;
+                showStatus('检测到充电已结束状态');
+            }
+        }
         
         // 加载充电枪信息
         function loadGunInfo() {

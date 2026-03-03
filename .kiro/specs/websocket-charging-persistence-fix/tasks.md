@@ -1,0 +1,106 @@
+# Implementation Plan
+
+- [x] 1. 编写故障条件探索测试
+  - **Property 1: Fault Condition** - 充电会话独立于WebSocket连接
+  - **关键**: 此测试必须在未修复的代码上失败 - 失败确认bug存在
+  - **不要在测试失败时尝试修复测试或代码**
+  - **注意**: 此测试编码了期望行为 - 在实现后通过时将验证修复
+  - **目标**: 展示证明bug存在的反例
+  - **作用域PBT方法**: 对于确定性bug，将属性限定为具体的失败案例以确保可重现性
+  - 测试实现细节来自设计文档中的故障条件
+  - 测试断言应匹配设计文档中的预期行为属性
+  - 在未修复的代码上运行测试
+  - **预期结果**: 测试失败（这是正确的 - 证明bug存在）
+  - 记录发现的反例以理解根本原因
+  - 当测试编写完成、运行并记录失败时标记任务完成
+  - 测试场景：
+    - 场景1: 用户在充电过程中关闭页面标签页，返回时无法恢复连接
+    - 场景2: 用户在充电过程中导航到其他页面，返回时无法恢复连接
+    - 场景3: 页面刷新后无法恢复充电状态
+    - 场景4: WebSocket断开后页面刷新无法恢复连接
+  - 验证点：
+    - 充电会话在数据库中保持活跃状态（status=1）
+    - 页面重新打开时前端无法检测到活跃会话
+    - 页面重新打开时UI显示为空闲状态而非充电中
+    - 页面重新打开时WebSocket连接未自动建立
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5_
+
+- [x] 2. 编写保留性属性测试（在实现修复之前）
+  - **Property 2: Preservation** - 充电控制操作行为不变
+  - **重要**: 遵循观察优先方法
+  - 在未修复的代码上观察非bug输入的行为
+  - 编写基于属性的测试捕获从保留需求观察到的行为模式
+  - 基于属性的测试生成许多测试用例以提供更强保证
+  - 在未修复的代码上运行测试
+  - **预期结果**: 测试通过（这确认了要保留的基线行为）
+  - 当测试编写完成、在未修复代码上运行并通过时标记任务完成
+  - 测试场景：
+    - 插枪操作：验证状态转换、数据库操作、缓存操作
+    - 启动充电操作：验证状态转换、WebSocket连接建立、数据推送
+    - 结束充电操作：验证状态转换、WebSocket连接关闭、会话结束
+    - 拔枪操作：验证状态清理、充电枪恢复空闲
+    - 重置操作：验证强制结束所有会话、状态重置
+  - 验证点：
+    - 所有充电控制API调用产生相同的响应
+    - 数据库状态变化相同
+    - Redis缓存操作相同
+    - WebSocket推送逻辑相同
+    - 错误处理行为相同
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+- [x] 3. WebSocket充电持久性修复
+
+  - [x] 3.1 实现后端状态查询API
+    - 在`ChargingController`中添加`GET /api/charging/active-session?gunId={gunId}`端点
+    - 在`ChargingService`中实现`getActiveSessionByGunId(Long gunId)`方法
+    - 首先从Redis缓存查询`gun:session:{gunId}`
+    - 如果缓存未命中，从数据库查询status=0或1的会话
+    - 返回会话VO对象，包含sessionId、status、vehicleId等完整信息
+    - 如果没有活跃会话，返回null或空对象
+    - _Bug_Condition: isBugCondition(input) where (input.type == "PAGE_CLOSE" OR input.type == "PAGE_NAVIGATION" OR input.type == "WEBSOCKET_DISCONNECT") AND existsActiveChargingSession(input.gunId) AND chargingSessionStatus(input.sessionId) == 1 AND NOT canResumeOnReturn()_
+    - _Expected_Behavior: 充电会话SHALL继续进行而不被中断，用户返回页面时SHALL能够自动恢复WebSocket连接并显示当前充电状态_
+    - _Preservation: 所有充电控制操作（插枪、启动充电、结束充电、拔枪、重置）必须保持原有行为不变_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+  - [x] 3.2 实现前端状态恢复逻辑
+    - 在`charging-simulator.html`的页面加载时调用状态查询API
+    - 创建`restoreSessionState(sessionData)`函数恢复UI状态
+    - 如果存在活跃会话，设置sessionId变量
+    - 根据会话状态更新UI（按钮状态、状态文本、车辆信息）
+    - 如果会话状态为充电中（status=1），自动建立WebSocket连接
+    - 如果会话状态为已结束（status=2），显示充电已结束状态
+    - 保持现有的WebSocket重连逻辑（3秒后重试）
+    - _Bug_Condition: isBugCondition(input) where (input.type == "PAGE_CLOSE" OR input.type == "PAGE_NAVIGATION" OR input.type == "WEBSOCKET_DISCONNECT") AND existsActiveChargingSession(input.gunId) AND chargingSessionStatus(input.sessionId) == 1 AND NOT canResumeOnReturn()_
+    - _Expected_Behavior: 充电会话SHALL继续进行而不被中断，用户返回页面时SHALL能够自动恢复WebSocket连接并显示当前充电状态_
+    - _Preservation: 所有充电控制操作（插枪、启动充电、结束充电、拔枪、重置）必须保持原有行为不变_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7_
+
+  - [x] 3.3 验证故障条件探索测试现在通过
+    - **Property 1: Expected Behavior** - 充电会话独立于WebSocket连接
+    - **重要**: 重新运行步骤1中的相同测试 - 不要编写新测试
+    - 步骤1中的测试编码了期望行为
+    - 当此测试通过时，确认期望行为得到满足
+    - 运行步骤1中的故障条件探索测试
+    - **预期结果**: 测试通过（确认bug已修复）
+    - 验证点：
+      - 充电会话在页面关闭后继续进行
+      - 页面重新打开时能够检测到活跃会话
+      - 页面重新打开时UI正确显示充电状态
+      - 页面重新打开时WebSocket连接自动建立
+      - 充电数据能够继续实时推送
+    - _Requirements: 设计文档中的预期行为属性_
+
+  - [x] 3.4 验证保留性测试仍然通过
+    - **Property 2: Preservation** - 充电控制操作行为不变
+    - **重要**: 重新运行步骤2中的相同测试 - 不要编写新测试
+    - 运行步骤2中的保留性属性测试
+    - **预期结果**: 测试通过（确认没有回归）
+    - 确认修复后所有测试仍然通过（没有回归）
+    - 验证点：
+      - 所有充电控制操作产生相同的行为
+      - 数据库和缓存操作保持一致
+      - WebSocket推送逻辑不受影响
+      - 错误处理行为保持不变
+
+- [x] 4. 检查点 - 确保所有测试通过
+  - 确保所有测试通过，如有问题请询问用户
