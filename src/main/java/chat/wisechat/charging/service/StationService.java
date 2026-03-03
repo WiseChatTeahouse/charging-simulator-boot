@@ -136,6 +136,17 @@ public class StationService {
         cache.put(cacheKey, vo);
         return vo;
     }
+    
+    /**
+     * 根据充电枪ID查询充电桩详情
+     */
+    public ChargingPileDetailVO getPileDetailByGunId(Long gunId) {
+        ChargingGun gun = gunMapper.selectById(gunId);
+        if (gun == null) {
+            throw new BusinessException("充电枪不存在");
+        }
+        return getPileDetail(gun.getPileId());
+    }
     /**
      * 清除充电桩详情缓存
      */

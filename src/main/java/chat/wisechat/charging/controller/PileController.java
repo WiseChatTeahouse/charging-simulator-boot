@@ -36,4 +36,17 @@ public class PileController {
         ChargingPileDetailVO detail = stationService.getPileDetail(pileId);
         return Result.success(detail);
     }
+    
+    /**
+     * 根据充电枪ID获取充电桩详情
+     */
+    @GetMapping("/by-gun/{gunId}")
+    public Result<ChargingPileDetailVO> getPileDetailByGunId(@PathVariable Long gunId) {
+        log.info("根据充电枪ID查询充电桩详情: {}", gunId);
+        if (gunId == null || gunId <= 0) {
+            return Result.error("充电枪ID无效");
+        }
+        ChargingPileDetailVO detail = stationService.getPileDetailByGunId(gunId);
+        return Result.success(detail);
+    }
 }

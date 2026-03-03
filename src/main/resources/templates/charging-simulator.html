@@ -318,9 +318,61 @@
         
         // 加载充电枪信息
         function loadGunInfo() {
-            document.getElementById('gun-code').textContent = 'GUN-' + gunId;
-            document.getElementById('gun-type').textContent = '快充';
-            document.getElementById('gun-status').textContent = '空闲';
+            // 从后端获取充电桩详情（通过充电枪ID）
+            fetch('/api/piles/by-gun/' + gunId)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 200) {
+                        const pileDetail = result.data;
+                        // 查找当前充电枪
+                        const gun = pileDetail.guns.find(g => g.id == gunId);
+                        if (gun) {
+                            document.getElementById('gun-code').textContent = gun.code;
+                            document.getElementById('gun-type').textContent = gun.typeText;
+                            document.getElementById('gun-status').textContent = gun.statusText;
+                            
+                            // 根据充电枪状态更新按钮状态
+                            updateButtonsByGunStatus(gun.status);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('加载充电枪信息失败:', error);
+                    // 降级处理：显示默认信息
+                    document.getElementById('gun-code').textContent = 'GUN-' + gunId;
+                    document.getElementById('gun-type').textContent = '快充';
+                    document.getElementById('gun-status').textContent = '未知';
+                });
+        }
+        
+        // 根据充电枪状态更新按钮
+        function updateButtonsByGunStatus(status) {
+            // status: 0=空闲, 1=充电中, 2=故障
+            const btnInsert = document.getElementById('btn-insert-gun');
+            const btnStart = document.getElementById('btn-start-charging');
+            const btnStop = document.getElementById('btn-stop-charging');
+            const btnRemove = document.getElementById('btn-remove-gun');
+            
+            if (status === 0) {
+                // 空闲状态：只能插枪
+                btnInsert.disabled = false;
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+                btnRemove.disabled = true;
+            } else if (status === 1) {
+                // 充电中状态：只能结束充电
+                btnInsert.disabled = true;
+                btnStart.disabled = true;
+                btnStop.disabled = false;
+                btnRemove.disabled = true;
+                showStatus('充电枪正在充电中');
+            } else {
+                // 故障或其他状态：禁用所有按钮
+                btnInsert.disabled = true;
+                btnStart.disabled = true;
+                btnStop.disabled = true;
+                btnRemove.disabled = true;
+            }
         }
         
         // 初始化按钮事件
