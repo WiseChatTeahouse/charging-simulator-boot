@@ -1,11 +1,44 @@
 server:
   port: 8080
+
 spring:
   application:
     name: charging-simulator-boot
+  
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/charging_simulator?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password: root
+    password: admin123
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 0
+      timeout: 3000ms
+  thymeleaf:
+    cache: false
+    prefix: classpath:/templates/
+    suffix: .html
+    encoding: UTF-8
+
+
+# MQTT 配置
+mqtt:
+  broker-url: tcp://localhost:1883
+  client-id: charging-simulator-${random.value}
+  username: admin
+  password: admin
+  topics:
+    charging-data: charging/+/pile/+/gun/+/data
+    bms-data: vehicle/+/bms/data
+  qos: 1
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: chat.wisechat.charging.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

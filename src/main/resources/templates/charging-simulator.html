@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>充电模拟器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .simulator-container {
+            display: flex;
+            height: 100vh;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .left-panel, .right-panel {
+            flex: 1;
+            background: #16213e;
+            border-radius: 12px;
+            padding: 24px;
+            overflow-y: auto;
+        }
+        
+        .right-panel.grayed-out {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+        
+        h2 {
+            color: #00d4ff;
+            margin-bottom: 20px;
+            font-size: 24px;
+            border-bottom: 2px solid #00d4ff;
+            padding-bottom: 10px;
+        }
+        
+        .gun-info {
+            background: #0f3460;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        
+        .info-label {
+            color: #aaa;
+        }
+        
+        .info-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        
+        .control-buttons {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        
+        .btn {
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .btn-insert {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-insert:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-start {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .btn-start:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(245, 87, 108, 0.4);
+        }
+        
+        .btn-stop {
+            background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
+            color: white;
+        }
+        
+        .btn-stop:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(250, 112, 154, 0.4);
+        }
+        
+        .btn-remove {
+            background: linear-gradient(135deg, #30cfd0 0%, #330867 100%);
+            color: white;
+        }
+        
+        .btn-remove:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(48, 207, 208, 0.4);
+        }
+        
+        .data-display {
+            background: #0f3460;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        
+        .data-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .data-item:last-child {
+            border-bottom: none;
+        }
+        
+        .data-label {
+            color: #aaa;
+            font-size: 14px;
+        }
+        
+        .data-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .data-unit {
+            font-size: 14px;
+            color: #aaa;
+            margin-left: 4px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            color: #00d4ff;
+            text-decoration: none;
+            margin-bottom: 16px;
+            transition: color 0.3s;
+        }
+        
+        .back-link:hover {
+            color: #00a8cc;
+        }
+        
+        .status-message {
+            background: #0f3460;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+            text-align: center;
+            font-size: 14px;
+            color: #00d4ff;
+        }
+    </style>
+</head>
+<body>
+    <div class="simulator-container">
+        <!-- 左侧：充电站数据 -->
+        <div class="left-panel">
+            <a href="javascript:history.back()" class="back-link">← 返回</a>
+            
+            <h2>充电枪信息</h2>
+            <div class="gun-info" id="gun-info">
+                <div class="info-item">
+                    <span class="info-label">充电枪编号:</span>
+                    <span class="info-value" id="gun-code">--</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">充电枪类型:</span>
+                    <span class="info-value" id="gun-type">--</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">充电枪状态:</span>
+                    <span class="info-value" id="gun-status">--</span>
+                </div>
+            </div>
+            
+            <div id="status-message" class="status-message" style="display: none;"></div>
+            
+            <h2>充电控制</h2>
+            <div class="control-buttons">
+                <button id="btn-insert-gun" class="btn btn-insert">插枪</button>
+                <button id="btn-start-charging" class="btn btn-start" disabled>启动充电</button>
+                <button id="btn-stop-charging" class="btn btn-stop" disabled>结束充电</button>
+                <button id="btn-remove-gun" class="btn btn-remove" disabled>拔枪</button>
+            </div>
+            
+            <h2>充电数据</h2>
+            <div id="charging-data" class="data-display">
+                <div class="data-item">
+                    <span class="data-label">电压</span>
+                    <span>
+                        <span class="data-value" id="voltage">--</span>
+                        <span class="data-unit">V</span>
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">电流</span>
+                    <span>
+                        <span class="data-value" id="current">--</span>
+                        <span class="data-unit">A</span>
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">功率</span>
+                    <span>
+                        <span class="data-value" id="power">--</span>
+                        <span class="data-unit">kW</span>
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">SOC</span>
+                    <span>
+                        <span class="data-value" id="soc">--</span>
+                        <span class="data-unit">%</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧：车辆数据 -->
+        <div class="right-panel grayed-out" id="vehicle-panel">
+            <h2>车辆 BMS 数据</h2>
+            <div id="bms-data" class="data-display">
+                <div class="data-item">
+                    <span class="data-label">电池电压</span>
+                    <span>
+                        <span class="data-value" id="battery-voltage">--</span>
+                        <span class="data-unit">V</span>
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">电池电流</span>
+                    <span>
+                        <span class="data-value" id="battery-current">--</span>
+                        <span class="data-unit">A</span>
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">电池温度</span>
+                    <span>
+                        <span class="data-value" id="battery-temp">--</span>
+                        <span class="data-unit">°C</span>
+                    </span>
+                </div>
+                <div class="data-item">
+                    <span class="data-label">SOC</span>
+                    <span>
+                        <span class="data-value" id="battery-soc">--</span>
+                        <span class="data-unit">%</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        const gunId = window.location.pathname.split('/').pop();
+        let sessionId = null;
+        let ws = null;
+        
+        // 页面加载时初始化
+        window.onload = function() {
+            loadGunInfo();
+            initButtons();
+        };
+    </script>
+</body>
+</html>
+
+        // 加载充电枪信息
+        function loadGunInfo() {
+            // 这里可以调用 API 获取充电枪详细信息
+            // 暂时使用模拟数据
+            document.getElementById('gun-code').textContent = 'GUN-' + gunId;
+            document.getElementById('gun-type').textContent = '快充';
+            document.getElementById('gun-status').textContent = '空闲';
+        }
+        
+        // 初始化按钮事件
+        function initButtons() {
+            document.getElementById('btn-insert-gun').addEventListener('click', insertGun);
+            document.getElementById('btn-start-charging').addEventListener('click', startCharging);
+            document.getElementById('btn-stop-charging').addEventListener('click', stopCharging);
+            document.getElementById('btn-remove-gun').addEventListener('click', removeGun);
+        }
+        
+        // 插枪操作
+        function insertGun() {
+            showStatus('正在插枪...');
+            
+            fetch('/api/charging/insert-gun', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    gunId: parseInt(gunId), 
+                    vehicleId: 'TEST_VEHICLE_001' 
+                })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.code === 200) {
+                    sessionId = result.data;
+                    showStatus('插枪成功！会话ID: ' + sessionId);
+                    
+                    // 更新按钮状态
+                    document.getElementById('btn-insert-gun').disabled = true;
+                    document.getElementById('btn-start-charging').disabled = false;
+                    document.getElementById('gun-status').textContent = '已插枪';
+                } else {
+                    showStatus('插枪失败: ' + result.message, true);
+                }
+            })
+            .catch(error => {
+                console.error('插枪失败:', error);
+                showStatus('插枪失败，请稍后重试', true);
+            });
+        }
+        
+        // 启动充电
+        function startCharging() {
+            if (!sessionId) {
+                showStatus('请先插枪', true);
+                return;
+            }
+            
+            showStatus('正在启动充电...');
+            
+            fetch('/api/charging/start', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: sessionId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.code === 200) {
+                    showStatus('充电已启动');
+                    
+                    // 更新按钮状态
+                    document.getElementById('btn-start-charging').disabled = true;
+                    document.getElementById('btn-stop-charging').disabled = false;
+                    document.getElementById('gun-status').textContent = '充电中';
+                    
+                    // 右侧面板变为正常显示
+                    document.getElementById('vehicle-panel').classList.remove('grayed-out');
+                    
+                    // 建立 WebSocket 连接
+                    connectWebSocket();
+                } else {
+                    showStatus('启动充电失败: ' + result.message, true);
+                }
+            })
+            .catch(error => {
+                console.error('启动充电失败:', error);
+                showStatus('启动充电失败，请稍后重试', true);
+            });
+        }
+        
+        // 结束充电
+        function stopCharging() {
+            if (!sessionId) {
+                showStatus('没有活跃的充电会话', true);
+                return;
+            }
+            
+            showStatus('正在结束充电...');
+            
+            fetch('/api/charging/stop', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: sessionId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.code === 200) {
+                    const chargingResult = result.data;
+                    showStatus(`充电结束！总电量: ${chargingResult.totalPower} kWh, 时长: ${chargingResult.chargingDuration} 分钟`);
+                    
+                    // 更新按钮状态
+                    document.getElementById('btn-stop-charging').disabled = true;
+                    document.getElementById('btn-remove-gun').disabled = false;
+                    document.getElementById('gun-status').textContent = '已结束';
+                    
+                    // 断开 WebSocket
+                    if (ws) {
+                        ws.close();
+                        ws = null;
+                    }
+                } else {
+                    showStatus('结束充电失败: ' + result.message, true);
+                }
+            })
+            .catch(error => {
+                console.error('结束充电失败:', error);
+                showStatus('结束充电失败，请稍后重试', true);
+            });
+        }
+        
+        // 拔枪操作
+        function removeGun() {
+            if (!sessionId) {
+                showStatus('没有活跃的充电会话', true);
+                return;
+            }
+            
+            showStatus('正在拔枪...');
+            
+            fetch('/api/charging/remove-gun', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionId: sessionId })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.code === 200) {
+                    showStatus('拔枪成功！');
+                    
+                    // 重置状态
+                    sessionId = null;
+                    document.getElementById('btn-insert-gun').disabled = false;
+                    document.getElementById('btn-start-charging').disabled = true;
+                    document.getElementById('btn-stop-charging').disabled = true;
+                    document.getElementById('btn-remove-gun').disabled = true;
+                    document.getElementById('gun-status').textContent = '空闲';
+                    
+                    // 右侧面板变为置灰
+                    document.getElementById('vehicle-panel').classList.add('grayed-out');
+                    
+                    // 重置数据显示
+                    resetDataDisplay();
+                } else {
+                    showStatus('拔枪失败: ' + result.message, true);
+                }
+            })
+            .catch(error => {
+                console.error('拔枪失败:', error);
+                showStatus('拔枪失败，请稍后重试', true);
+            });
+        }
+        
+        // 显示状态消息
+        function showStatus(message, isError = false) {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.style.display = 'block';
+            statusEl.style.background = isError ? '#721c24' : '#0f3460';
+            statusEl.style.color = isError ? '#f8d7da' : '#00d4ff';
+            
+            // 3秒后自动隐藏
+            setTimeout(() => {
+                statusEl.style.display = 'none';
+            }, 3000);
+        }
+        
+        // 重置数据显示
+        function resetDataDisplay() {
+            document.getElementById('voltage').textContent = '--';
+            document.getElementById('current').textContent = '--';
+            document.getElementById('power').textContent = '--';
+            document.getElementById('soc').textContent = '--';
+            document.getElementById('battery-voltage').textContent = '--';
+            document.getElementById('battery-current').textContent = '--';
+            document.getElementById('battery-temp').textContent = '--';
+            document.getElementById('battery-soc').textContent = '--';
+        }
+        
+        // 连接 WebSocket
+        function connectWebSocket() {
+            if (!sessionId) {
+                console.error('没有会话ID，无法建立 WebSocket 连接');
+                return;
+            }
+            
+            const wsUrl = 'ws://' + window.location.host + '/ws/charging/' + sessionId;
+            console.log('连接 WebSocket:', wsUrl);
+            
+            ws = new WebSocket(wsUrl);
+            
+            ws.onopen = function() {
+                console.log('WebSocket 连接已建立');
+                showStatus('实时数据连接成功');
+            };
+            
+            ws.onmessage = function(event) {
+                try {
+                    const message = JSON.parse(event.data);
+                    console.log('收到消息:', message);
+                    
+                    if (message.type === 'CHARGING_DATA') {
+                        updateChargingData(message.data);
+                    } else if (message.type === 'BMS_DATA') {
+                        updateBmsData(message.data);
+                    }
+                } catch (error) {
+                    console.error('解析消息失败:', error);
+                }
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket 错误:', error);
+                showStatus('实时数据连接失败', true);
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket 连接已关闭');
+                
+                // 如果充电还在进行中，尝试重连
+                if (sessionId && !document.getElementById('btn-stop-charging').disabled) {
+                    console.log('尝试重新连接...');
+                    setTimeout(connectWebSocket, 3000);
+                }
+            };
+        }
+        
+        // 更新充电数据
+        function updateChargingData(data) {
+            if (data.voltage !== undefined && data.voltage !== null) {
+                document.getElementById('voltage').textContent = data.voltage.toFixed(1);
+            }
+            if (data.current !== undefined && data.current !== null) {
+                document.getElementById('current').textContent = data.current.toFixed(1);
+            }
+            if (data.power !== undefined && data.power !== null) {
+                document.getElementById('power').textContent = data.power.toFixed(2);
+            }
+            if (data.soc !== undefined && data.soc !== null) {
+                document.getElementById('soc').textContent = data.soc;
+            }
+        }
+        
+        // 更新 BMS 数据
+        function updateBmsData(data) {
+            if (data.batteryVoltage !== undefined && data.batteryVoltage !== null) {
+                document.getElementById('battery-voltage').textContent = data.batteryVoltage.toFixed(1);
+            }
+            if (data.batteryCurrent !== undefined && data.batteryCurrent !== null) {
+                document.getElementById('battery-current').textContent = data.batteryCurrent.toFixed(1);
+            }
+            if (data.batteryTemp !== undefined && data.batteryTemp !== null) {
+                document.getElementById('battery-temp').textContent = data.batteryTemp.toFixed(1);
+            }
+            if (data.soc !== undefined && data.soc !== null) {
+                document.getElementById('battery-soc').textContent = data.soc;
+            }
+        }
+    </script>
+</body>
+</html>
