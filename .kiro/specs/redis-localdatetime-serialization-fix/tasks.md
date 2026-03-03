@@ -1,0 +1,94 @@
+# Implementation Plan
+
+- [x] 1. Write bug condition exploration test
+  - **Property 1: Fault Condition** - LocalDateTime Serialization Failure
+  - **CRITICAL**: This test MUST FAIL on unfixed code - failure confirms the bug exists
+  - **DO NOT attempt to fix the test or the code when it fails**
+  - **NOTE**: This test encodes the expected behavior - it will validate the fix when it passes after implementation
+  - **GOAL**: Surface counterexamples that demonstrate the bug exists
+  - **Scoped PBT Approach**: Scope the property to concrete failing cases - ChargingSession objects with LocalDateTime fields
+  - Test that RedisTemplate.opsForValue().set() throws SerializationException when storing ChargingSession with LocalDateTime fields (startTime, endTime, createTime, updateTime)
+  - Test cases:
+    - Serialize ChargingSession with startTime=LocalDateTime.now()
+    - Serialize ChargingSession with all four LocalDateTime fields populated
+    - Deserialize ChargingSession from JSON with ISO-8601 formatted dates
+    - Round-trip test: serialize then deserialize a ChargingSession
+  - Run test on UNFIXED code
+  - **EXPECTED OUTCOME**: Test FAILS with SerializationException: "Could not write JSON: Java 8 date/time type `java.time.LocalDateTime` not supported by default"
+  - Document counterexamples found to understand root cause (missing JavaTimeModule registration)
+  - Mark task complete when test is written, run, and failure is documented
+  - _Requirements: 1.1, 1.2, 1.3_
+
+- [x] 2. Write preservation property tests (BEFORE implementing fix)
+  - **Property 2: Preservation** - Non-Date Type Serialization
+  - **IMPORTANT**: Follow observation-first methodology
+  - Observe behavior on UNFIXED code for non-LocalDateTime objects:
+    - Long sessionId values for gun:session and vehicle:session mappings
+    - String vehicleId values
+    - BigDecimal totalPower values
+    - ChargingDataVO objects cached in charging:data:* keys
+    - VehicleBmsDataVO objects cached in bms:data:* keys
+  - Write property-based tests capturing observed serialization behavior patterns:
+    - Test that Long values serialize/deserialize correctly
+    - Test that String values serialize/deserialize correctly
+    - Test that BigDecimal values serialize/deserialize correctly
+    - Test that ChargingDataVO objects serialize/deserialize correctly
+    - Test that VehicleBmsDataVO objects serialize/deserialize correctly
+  - Property-based testing generates many test cases for stronger guarantees
+  - Run tests on UNFIXED code
+  - **EXPECTED OUTCOME**: Tests PASS (this confirms baseline behavior to preserve)
+  - Mark task complete when tests are written, run, and passing on unfixed code
+  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+
+- [x] 3. Fix Redis LocalDateTime serialization
+
+  - [x] 3.1 Verify jackson-datatype-jsr310 dependency
+    - Check pom.xml for jackson-datatype-jsr310 dependency
+    - Spring Boot 3.5.11 includes this module by default via spring-boot-starter-web
+    - If not present, add dependency explicitly
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+
+  - [x] 3.2 Configure custom ObjectMapper with JavaTimeModule
+    - Modify RedisConfig.redisTemplate() method
+    - Create custom ObjectMapper instance
+    - Call objectMapper.findAndRegisterModules() to auto-discover and register jackson-datatype-jsr310
+    - Pass custom ObjectMapper to GenericJackson2JsonRedisSerializer constructor
+    - Replace `new GenericJackson2JsonRedisSerializer()` with `new GenericJackson2JsonRedisSerializer(objectMapper)`
+    - Maintain all existing RedisTemplate configuration (StringRedisSerializer for keys, connection factory, etc.)
+    - _Bug_Condition: isBugCondition(input) where containsLocalDateTimeField(input) AND NOT jacksonObjectMapperHasJavaTimeModule() AND serializationAttempted(input)_
+    - _Expected_Behavior: LocalDateTime fields serialize to ISO-8601 format JSON strings and deserialize back to java.time.LocalDateTime objects without throwing SerializationException_
+    - _Preservation: Serialization of primitive types (Long, Integer, String), BigDecimal, and custom objects (ChargingDataVO, VehicleBmsDataVO) must remain unchanged_
+    - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 3.4_
+
+  - [x] 3.3 Verify bug condition exploration test now passes
+    - **Property 1: Expected Behavior** - LocalDateTime Serialization Support
+    - **IMPORTANT**: Re-run the SAME test from task 1 - do NOT write a new test
+    - The test from task 1 encodes the expected behavior
+    - When this test passes, it confirms the expected behavior is satisfied
+    - Run bug condition exploration test from step 1
+    - **EXPECTED OUTCOME**: Test PASSES (confirms bug is fixed)
+    - Verify all test cases pass:
+      - ChargingSession with startTime serializes successfully
+      - ChargingSession with all LocalDateTime fields serializes successfully
+      - Deserialization from JSON with ISO-8601 dates works correctly
+      - Round-trip serialization/deserialization preserves LocalDateTime values
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+
+  - [x] 3.4 Verify preservation tests still pass
+    - **Property 2: Preservation** - Non-Date Type Serialization
+    - **IMPORTANT**: Re-run the SAME tests from task 2 - do NOT write new tests
+    - Run preservation property tests from step 2
+    - **EXPECTED OUTCOME**: Tests PASS (confirms no regressions)
+    - Confirm all tests still pass after fix:
+      - Long values serialize/deserialize identically
+      - String values serialize/deserialize identically
+      - BigDecimal values serialize/deserialize identically
+      - ChargingDataVO objects serialize/deserialize identically
+      - VehicleBmsDataVO objects serialize/deserialize identically
+    - _Requirements: 3.1, 3.2, 3.3, 3.4_
+
+- [x] 4. Checkpoint - Ensure all tests pass
+  - Run all unit tests and property-based tests
+  - Verify no SerializationException occurs in ChargingService operations
+  - Verify RedisTemplate bean initializes successfully
+  - Ensure all tests pass, ask the user if questions arise
