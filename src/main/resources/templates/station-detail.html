@@ -173,7 +173,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <a href="/stations" class="back-btn">← 返回站点列表</a>
+            <a href="javascript:history.back()" class="back-btn">← 返回站点列表</a>
             <div class="station-title" id="station-name">加载中...</div>
             <div class="station-info" id="station-address"></div>
         </div>
@@ -215,26 +215,28 @@
                 return;
             }
             
-            // 为每个充电桩加载充电枪
-            Promise.all(station.piles.map(pile => loadPileGuns(pile)))
+            // 批量加载所有充电桩的充电枪（并行请求）
+            const pileIds = station.piles.map(pile => pile.id);
+            Promise.all(pileIds.map(pileId => loadPileGuns(pileId)))
                 .then(pilesWithGuns => {
                     renderPiles(pilesWithGuns);
+                })
+                .catch(error => {
+                    console.error('加载充电枪失败:', error);
+                    // 降级处理：只显示充电桩信息
+                    renderPiles(station.piles.map(pile => ({...pile, guns: []})));
                 });
         }
         
-        // 加载充电桩的充电枪
-        function loadPileGuns(pile) {
-            return fetch('/api/piles/' + pile.id)
+        // 加载充电桩的充电枪（优化：直接返回数据，不需要额外处理）
+        function loadPileGuns(pileId) {
+            return fetch('/api/piles/' + pileId)
                 .then(response => response.json())
                 .then(result => {
                     if (result.code === 200) {
                         return result.data;
                     }
-                    return pile;
-                })
-                .catch(error => {
-                    console.error('加载充电枪失败:', error);
-                    return pile;
+                    throw new Error('加载失败');
                 });
         }
         
