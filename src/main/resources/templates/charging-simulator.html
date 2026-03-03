@@ -303,14 +303,9 @@
             loadGunInfo();
             initButtons();
         };
-    </script>
-</body>
-</html>
-
+        
         // 加载充电枪信息
         function loadGunInfo() {
-            // 这里可以调用 API 获取充电枪详细信息
-            // 暂时使用模拟数据
             document.getElementById('gun-code').textContent = 'GUN-' + gunId;
             document.getElementById('gun-type').textContent = '快充';
             document.getElementById('gun-status').textContent = '空闲';
@@ -338,6 +333,7 @@
             })
             .then(response => response.json())
             .then(result => {
+                console.log('插枪响应:', result);
                 if (result.code === 200) {
                     sessionId = result.data;
                     showStatus('插枪成功！会话ID: ' + sessionId);
@@ -372,6 +368,7 @@
             })
             .then(response => response.json())
             .then(result => {
+                console.log('启动充电响应:', result);
                 if (result.code === 200) {
                     showStatus('充电已启动');
                     
@@ -411,6 +408,7 @@
             })
             .then(response => response.json())
             .then(result => {
+                console.log('结束充电响应:', result);
                 if (result.code === 200) {
                     const chargingResult = result.data;
                     showStatus(`充电结束！总电量: ${chargingResult.totalPower} kWh, 时长: ${chargingResult.chargingDuration} 分钟`);
@@ -451,6 +449,7 @@
             })
             .then(response => response.json())
             .then(result => {
+                console.log('拔枪响应:', result);
                 if (result.code === 200) {
                     showStatus('拔枪成功！');
                     
