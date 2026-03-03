@@ -312,8 +312,8 @@
         
         // 页面加载时初始化
         window.onload = function() {
-            loadGunInfo();
             initButtons();
+            // 先检查活跃会话，如果有则恢复状态，否则加载充电枪信息
             checkAndRestoreActiveSession();
         };
         
@@ -328,10 +328,14 @@
                         restoreSessionState(sessionData);
                     } else {
                         console.log('没有活跃会话');
+                        // 没有活跃会话时才加载充电枪信息
+                        loadGunInfo();
                     }
                 })
                 .catch(error => {
                     console.error('查询活跃会话失败:', error);
+                    // 出错时也加载充电枪信息
+                    loadGunInfo();
                 });
         }
         
@@ -339,6 +343,9 @@
         function restoreSessionState(sessionData) {
             // 设置sessionId
             sessionId = sessionData.id;
+            
+            // 先加载充电枪基本信息（编号、类型）
+            loadGunBasicInfo();
             
             // 根据会话状态更新UI
             const status = sessionData.status;
@@ -375,6 +382,27 @@
                 document.getElementById('btn-remove-gun').disabled = false;
                 showStatus('检测到充电已结束状态');
             }
+        }
+        
+        // 加载充电枪基本信息（不更新按钮状态）
+        function loadGunBasicInfo() {
+            fetch('/api/piles/by-gun/' + gunId)
+                .then(response => response.json())
+                .then(result => {
+                    if (result.code === 200) {
+                        const pileDetail = result.data;
+                        const gun = pileDetail.guns.find(g => g.id == gunId);
+                        if (gun) {
+                            document.getElementById('gun-code').textContent = gun.code;
+                            document.getElementById('gun-type').textContent = gun.typeText;
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('加载充电枪信息失败:', error);
+                    document.getElementById('gun-code').textContent = 'GUN-' + gunId;
+                    document.getElementById('gun-type').textContent = '快充';
+                });
         }
         
         // 加载充电枪信息
