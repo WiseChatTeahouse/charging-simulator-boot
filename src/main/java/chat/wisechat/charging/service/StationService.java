@@ -69,16 +69,9 @@ public class StationService {
     
     /**
      * 查询站点详情（包含充电桩和充电枪）
+     * 不使用缓存，直接查询数据库以获取实时状态
      */
     public StationDetailVO getStationDetail(Long stationId) {
-        String cacheKey = "station:detail:" + stationId;
-        
-        StationDetailVO cached = (StationDetailVO) cache.getIfPresent(cacheKey);
-        if (cached != null) {
-            log.info("从缓存获取站点详情: {}", stationId);
-            return cached;
-        }
-        
         Station station = stationMapper.selectById(stationId);
         if (station == null) {
             throw new BusinessException("站点不存在");
@@ -117,22 +110,14 @@ public class StationService {
         
         vo.setPiles(pileDetails);
         
-        cache.put(cacheKey, vo);
         return vo;
     }
     
     /**
      * 查询充电桩详情（包含充电枪）
+     * 不使用缓存，直接查询数据库以获取实时状态
      */
     public ChargingPileDetailVO getPileDetail(Long pileId) {
-        String cacheKey = "pile:detail:" + pileId;
-        
-        ChargingPileDetailVO cached = (ChargingPileDetailVO) cache.getIfPresent(cacheKey);
-        if (cached != null) {
-            log.info("从缓存获取充电桩详情: {}", pileId);
-            return cached;
-        }
-        
         ChargingPile pile = pileMapper.selectById(pileId);
         if (pile == null) {
             throw new BusinessException("充电桩不存在");
@@ -152,7 +137,6 @@ public class StationService {
                 .map(this::convertToChargingGunVO)
                 .collect(Collectors.toList()));
         
-        cache.put(cacheKey, vo);
         return vo;
     }
     
