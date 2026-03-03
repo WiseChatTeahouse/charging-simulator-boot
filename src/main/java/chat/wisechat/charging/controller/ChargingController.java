@@ -104,4 +104,19 @@ public class ChargingController {
         ChargingSessionVO session = chargingService.getSessionStatus(sessionId);
         return Result.success(session);
     }
+    
+    /**
+     * 重置充电枪状态
+     */
+    @PostMapping("/reset")
+    public Result<Void> resetGun(@RequestParam Long gunId) {
+        log.info("重置充电枪请求: gunId={}", gunId);
+        
+        if (gunId == null || gunId <= 0) {
+            return Result.error("充电枪ID无效");
+        }
+        
+        chargingService.resetGun(gunId);
+        return Result.success();
+    }
 }

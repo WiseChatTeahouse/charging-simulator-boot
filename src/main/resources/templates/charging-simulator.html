@@ -133,6 +133,16 @@
             box-shadow: 0 4px 12px rgba(48, 207, 208, 0.4);
         }
         
+        .btn-reset {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);
+            color: white;
+        }
+        
+        .btn-reset:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 107, 107, 0.4);
+        }
+        
         .data-display {
             background: #0f3460;
             padding: 20px;
@@ -222,6 +232,8 @@
                 <button id="btn-stop-charging" class="btn btn-stop" disabled>结束充电</button>
                 <button id="btn-remove-gun" class="btn btn-remove" disabled>拔枪</button>
             </div>
+            
+            <button id="btn-reset-gun" class="btn btn-reset" style="width: 100%; margin-bottom: 24px; background: linear-gradient(135deg, #ff6b6b 0%, #ee5a6f 100%);">重置</button>
             
             <h2>充电数据</h2>
             <div id="charging-data" class="data-display">
@@ -317,6 +329,7 @@
             document.getElementById('btn-start-charging').addEventListener('click', startCharging);
             document.getElementById('btn-stop-charging').addEventListener('click', stopCharging);
             document.getElementById('btn-remove-gun').addEventListener('click', removeGun);
+            document.getElementById('btn-reset-gun').addEventListener('click', resetGun);
         }
         
         // 插枪操作
@@ -473,6 +486,52 @@
             .catch(error => {
                 console.error('拔枪失败:', error);
                 showStatus('拔枪失败，请稍后重试', true);
+            });
+        }
+        
+        // 重置充电枪状态
+        function resetGun() {
+            if (!confirm('确定要重置充电枪状态吗？这将清除所有相关数据。')) {
+                return;
+            }
+            
+            showStatus('正在重置充电枪...');
+            
+            fetch('/api/charging/reset?gunId=' + gunId, {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(result => {
+                console.log('重置响应:', result);
+                if (result.code === 200) {
+                    showStatus('充电枪状态已重置');
+                    
+                    // 断开 WebSocket
+                    if (ws) {
+                        ws.close();
+                        ws = null;
+                    }
+                    
+                    // 重置所有状态
+                    sessionId = null;
+                    document.getElementById('btn-insert-gun').disabled = false;
+                    document.getElementById('btn-start-charging').disabled = true;
+                    document.getElementById('btn-stop-charging').disabled = true;
+                    document.getElementById('btn-remove-gun').disabled = true;
+                    document.getElementById('gun-status').textContent = '空闲';
+                    
+                    // 右侧面板变为置灰
+                    document.getElementById('vehicle-panel').classList.add('grayed-out');
+                    
+                    // 重置数据显示
+                    resetDataDisplay();
+                } else {
+                    showStatus('重置失败: ' + result.message, true);
+                }
+            })
+            .catch(error => {
+                console.error('重置失败:', error);
+                showStatus('重置失败，请稍后重试', true);
             });
         }
         

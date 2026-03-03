@@ -39,6 +39,9 @@ public class ChargingService {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
     
+    @Autowired
+    private StationService stationService;
+    
     /**
      * 插枪操作
      */
@@ -77,6 +80,9 @@ public class ChargingService {
         // 更新充电枪状态
         gun.setStatus(1); // 充电中
         gunMapper.updateById(gun);
+        
+        // 清除充电桩详情缓存
+        stationService.clearPileDetailCache(gun.getPileId());
         
         // 缓存会话状态
         String cacheKey = "session:status:" + session.getId();
@@ -193,6 +199,9 @@ public class ChargingService {
         if (gun != null) {
             gun.setStatus(0); // 空闲
             gunMapper.updateById(gun);
+            
+            // 清除充电桩详情缓存
+            stationService.clearPileDetailCache(gun.getPileId());
         }
         
         // 清除缓存
@@ -241,5 +250,58 @@ public class ChargingService {
             case 2: return "已结束";
             default: return "未知";
         }
+    }
+    
+    /**
+     * 重置充电枪状态
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void resetGun(Long gunId) {
+        log.info("重置充电枪状态: gunId={}", gunId);
+        
+        // 校验充电枪
+        ChargingGun gun = gunMapper.selectById(gunId);
+        if (gun == null) {
+            throw new BusinessException("充电枪不存在");
+        }
+        
+        // 查找并强制结束所有活跃会话
+        java.util.List<ChargingSession> activeSessions = sessionMapper.selectList(
+                new LambdaQueryWrapper<ChargingSession>()
+                        .eq(ChargingSession::getGunId, gunId)
+                        .in(ChargingSession::getStatus, 0, 1)
+        );
+        
+        if (!activeSessions.isEmpty()) {
+            log.warn("发现 {} 个活跃会话，将强制结束", activeSessions.size());
+            for (ChargingSession session : activeSessions) {
+                // 强制结束会话
+                session.setStatus(2); // 已结束
+                session.setEndTime(LocalDateTime.now());
+                sessionMapper.updateById(session);
+                
+                // 清除会话相关缓存
+                String cacheKey = "session:status:" + session.getId();
+                redisTemplate.delete(cacheKey);
+                
+                String vehicleSessionKey = "vehicle:session:" + session.getVehicleId();
+                redisTemplate.delete(vehicleSessionKey);
+                
+                log.info("强制结束会话: sessionId={}", session.getId());
+            }
+        }
+        
+        // 重置充电枪状态为空闲
+        gun.setStatus(0);
+        gunMapper.updateById(gun);
+        
+        // 清除相关Redis缓存
+        String gunSessionKey = "gun:session:" + gunId;
+        redisTemplate.delete(gunSessionKey);
+        
+        // 清除充电桩详情缓存
+        stationService.clearPileDetailCache(gun.getPileId());
+        
+        log.info("充电枪状态重置成功");
     }
 }

@@ -136,6 +136,14 @@ public class StationService {
         cache.put(cacheKey, vo);
         return vo;
     }
+    /**
+     * 清除充电桩详情缓存
+     */
+    public void clearPileDetailCache(Long pileId) {
+        String cacheKey = "pile:detail:" + pileId;
+        cache.invalidate(cacheKey);
+        log.info("清除充电桩详情缓存: {}", pileId);
+    }
     
     private StationVO convertToStationVO(Station station) {
         StationVO vo = new StationVO();
