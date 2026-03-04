@@ -31,8 +31,8 @@ mqtt:
   username: admin
   password: admin123
   topics:
-    charging-data: charging/+/pile/+/gun/+/data
-    bms-data: vehicle/+/bms/data
+    charging-data: "charging/station/+/pile/+/gun/+/data"
+    bms-data: "vehicle/+/bms/data"
   qos: 1
 
 # MyBatis-Plus 配置

@@ -309,6 +309,10 @@
         const gunId = window.location.pathname.split('/').pop();
         let sessionId = null;
         let ws = null;
+        let chargingDataTimer = null;
+        let bmsDataTimer = null;
+        let isCharging = false; // 充电状态标志
+        const DATA_TIMEOUT = 20000; // 20秒超时
         
         // 页面加载时初始化
         window.onload = function() {
@@ -362,6 +366,8 @@
                 showStatus('检测到已插枪状态，会话ID: ' + sessionId);
             } else if (status === 1) {
                 // 充电中状态
+                isCharging = true; // 设置充电状态
+                
                 document.getElementById('btn-insert-gun').disabled = true;
                 document.getElementById('btn-start-charging').disabled = true;
                 document.getElementById('btn-stop-charging').disabled = false;
@@ -526,6 +532,9 @@
                 if (result.code === 200) {
                     showStatus('充电已启动');
                     
+                    // 设置充电状态
+                    isCharging = true;
+                    
                     // 更新按钮状态
                     document.getElementById('btn-start-charging').disabled = true;
                     document.getElementById('btn-stop-charging').disabled = false;
@@ -567,6 +576,9 @@
                     const chargingResult = result.data;
                     showStatus(`充电结束！总电量: ${chargingResult.totalPower} kWh, 时长: ${chargingResult.chargingDuration} 分钟`);
                     
+                    // 清除充电状态
+                    isCharging = false;
+                    
                     // 更新按钮状态
                     document.getElementById('btn-stop-charging').disabled = true;
                     document.getElementById('btn-remove-gun').disabled = false;
@@ -607,6 +619,9 @@
                 if (result.code === 200) {
                     showStatus('拔枪成功！');
                     
+                    // 清除充电状态
+                    isCharging = false;
+                    
                     // 重置状态
                     sessionId = null;
                     document.getElementById('btn-insert-gun').disabled = false;
@@ -646,6 +661,9 @@
                 console.log('重置响应:', result);
                 if (result.code === 200) {
                     showStatus('充电枪状态已重置');
+                    
+                    // 清除充电状态
+                    isCharging = false;
                     
                     // 断开 WebSocket
                     if (ws) {
@@ -692,6 +710,16 @@
         
         // 重置数据显示
         function resetDataDisplay() {
+            // 清除所有定时器
+            if (chargingDataTimer) {
+                clearTimeout(chargingDataTimer);
+                chargingDataTimer = null;
+            }
+            if (bmsDataTimer) {
+                clearTimeout(bmsDataTimer);
+                bmsDataTimer = null;
+            }
+            
             document.getElementById('voltage').textContent = '--';
             document.getElementById('current').textContent = '--';
             document.getElementById('power').textContent = '--';
@@ -739,19 +767,28 @@
                 showStatus('实时数据连接失败', true);
             };
             
-            ws.onclose = function() {
-                console.log('WebSocket 连接已关闭');
+            ws.onclose = function(event) {
+                console.log('WebSocket 连接已关闭, code:', event.code, 'reason:', event.reason);
+                ws = null;
                 
                 // 如果充电还在进行中，尝试重连
-                if (sessionId && !document.getElementById('btn-stop-charging').disabled) {
-                    console.log('尝试重新连接...');
+                if (isCharging && sessionId) {
+                    console.log('充电进行中，3秒后尝试重新连接...');
+                    showStatus('连接断开，正在重连...', false);
                     setTimeout(connectWebSocket, 3000);
+                } else {
+                    console.log('充电已结束或无会话，不重连');
                 }
             };
         }
         
         // 更新充电数据
         function updateChargingData(data) {
+            // 清除之前的定时器
+            if (chargingDataTimer) {
+                clearTimeout(chargingDataTimer);
+            }
+            
             if (data.voltage !== undefined && data.voltage !== null) {
                 document.getElementById('voltage').textContent = data.voltage.toFixed(1);
             }
@@ -764,10 +801,24 @@
             if (data.soc !== undefined && data.soc !== null) {
                 document.getElementById('soc').textContent = data.soc;
             }
+            
+            // 设置新的定时器，20秒后如果没有新数据则显示 --
+            chargingDataTimer = setTimeout(() => {
+                document.getElementById('voltage').textContent = '--';
+                document.getElementById('current').textContent = '--';
+                document.getElementById('power').textContent = '--';
+                document.getElementById('soc').textContent = '--';
+                console.log('充电数据超时，已重置显示');
+            }, DATA_TIMEOUT);
         }
         
         // 更新 BMS 数据
         function updateBmsData(data) {
+            // 清除之前的定时器
+            if (bmsDataTimer) {
+                clearTimeout(bmsDataTimer);
+            }
+            
             if (data.batteryVoltage !== undefined && data.batteryVoltage !== null) {
                 document.getElementById('battery-voltage').textContent = data.batteryVoltage.toFixed(1);
             }
@@ -780,6 +831,15 @@
             if (data.soc !== undefined && data.soc !== null) {
                 document.getElementById('battery-soc').textContent = data.soc;
             }
+            
+            // 设置新的定时器，20秒后如果没有新数据则显示 --
+            bmsDataTimer = setTimeout(() => {
+                document.getElementById('battery-voltage').textContent = '--';
+                document.getElementById('battery-current').textContent = '--';
+                document.getElementById('battery-temp').textContent = '--';
+                document.getElementById('battery-soc').textContent = '--';
+                console.log('BMS 数据超时，已重置显示');
+            }, DATA_TIMEOUT);
         }
     </script>
 </body>

@@ -36,12 +36,31 @@ public class MqttService {
             MqttConnectOptions options = new MqttConnectOptions();
             options.setUserName(mqttConfig.getUsername());
             options.setPassword(mqttConfig.getPassword().toCharArray());
-            options.setCleanSession(true);
+            options.setCleanSession(false); // 改为 false 以保持订阅
             options.setAutomaticReconnect(true);
             options.setConnectionTimeout(10);
             options.setKeepAliveInterval(60);
             
-            mqttClient.setCallback(messageHandler);
+            // 设置回调
+            mqttClient.setCallback(new MqttCallback() {
+                @Override
+                public void connectionLost(Throwable cause) {
+                    log.error("MQTT 连接丢失，等待自动重连...", cause);
+                    messageHandler.connectionLost(cause);
+                }
+                
+                @Override
+                public void messageArrived(String topic, MqttMessage message) throws Exception {
+                    messageHandler.messageArrived(topic, message);
+                }
+                
+                @Override
+                public void deliveryComplete(IMqttDeliveryToken token) {
+                    messageHandler.deliveryComplete(token);
+                }
+            });
+            
+            // 连接并在连接成功后订阅
             mqttClient.connect(options);
             
             log.info("MQTT 客户端连接成功");
@@ -57,16 +76,22 @@ public class MqttService {
     /**
      * 订阅主题
      */
-    private void subscribeTopics() {
+    public void subscribeTopics() {
         try {
             if (mqttClient != null && mqttClient.isConnected()) {
                 // 订阅充电数据主题
-                mqttClient.subscribe(mqttConfig.getTopics().getChargingData(), mqttConfig.getQos());
-                log.info("订阅充电数据主题: {}", mqttConfig.getTopics().getChargingData());
+                String chargingTopic = mqttConfig.getTopics().getChargingData();
+                mqttClient.subscribe(chargingTopic, mqttConfig.getQos());
+                log.info("✓ 成功订阅充电数据主题: {} (QoS: {})", chargingTopic, mqttConfig.getQos());
                 
                 // 订阅 BMS 数据主题
-                mqttClient.subscribe(mqttConfig.getTopics().getBmsData(), mqttConfig.getQos());
-                log.info("订阅 BMS 数据主题: {}", mqttConfig.getTopics().getBmsData());
+                String bmsTopic = mqttConfig.getTopics().getBmsData();
+                mqttClient.subscribe(bmsTopic, mqttConfig.getQos());
+                log.info("✓ 成功订阅 BMS 数据主题: {} (QoS: {})", bmsTopic, mqttConfig.getQos());
+                
+                log.info("所有 MQTT 主题订阅完成，等待消息...");
+            } else {
+                log.error("MQTT 客户端未连接，无法订阅主题");
             }
         } catch (MqttException e) {
             log.error("订阅主题失败", e);

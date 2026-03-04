@@ -223,15 +223,31 @@ public class ChargingService {
     public ChargingSessionVO getSessionStatus(Long sessionId) {
         String cacheKey = "session:status:" + sessionId;
         
-        ChargingSession cached = (ChargingSession) redisTemplate.opsForValue().get(cacheKey);
-        if (cached != null) {
-            return convertToVO(cached);
+        try {
+            Object cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                // 如果是 ChargingSession 对象，直接转换
+                if (cached instanceof ChargingSession) {
+                    return convertToVO((ChargingSession) cached);
+                }
+                // 如果是其他类型，清除缓存并从数据库查询
+                log.warn("缓存数据类型不匹配，清除缓存: sessionId={}, type={}", sessionId, cached.getClass().getName());
+                redisTemplate.delete(cacheKey);
+            }
+        } catch (Exception e) {
+            // 反序列化失败，清除缓存
+            log.error("读取缓存失败，清除缓存: sessionId={}", sessionId, e);
+            redisTemplate.delete(cacheKey);
         }
         
+        // 从数据库查询
         ChargingSession session = sessionMapper.selectById(sessionId);
         if (session == null) {
             throw new BusinessException("充电会话不存在");
         }
+        
+        // 不再缓存 ChargingSession 对象，避免序列化问题
+        // 只缓存简单的状态信息
         
         return convertToVO(session);
     }

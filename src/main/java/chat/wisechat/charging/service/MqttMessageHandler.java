@@ -39,19 +39,25 @@ public class MqttMessageHandler implements MqttCallback {
     
     @Override
     public void connectionLost(Throwable cause) {
-        log.error("MQTT 连接丢失", cause);
+        log.error("MQTT 连接丢失，等待自动重连...", cause);
     }
     
     @Override
     public void messageArrived(String topic, MqttMessage message) {
         try {
             String payload = new String(message.getPayload());
-            log.debug("收到 MQTT 消息: topic={}, payload={}", topic, payload);
+            log.info("收到 MQTT 消息: topic={}, payload={}", topic, payload);
             
-            if (topic.contains("/charging/")) {
+            // 匹配充电数据主题: charging/station/{stationId}/pile/{pileId}/gun/{gunId}/data
+            if (topic.matches("charging/station/\\d+/pile/\\d+/gun/\\d+/data")) {
                 handleChargingData(topic, payload);
-            } else if (topic.contains("/vehicle/")) {
+            } 
+            // 匹配车辆 BMS 数据主题: vehicle/{vehicleId}/bms/data
+            else if (topic.matches("vehicle/.+/bms/data")) {
                 handleBmsData(topic, payload);
+            }
+            else {
+                log.warn("未知的主题格式: {}", topic);
             }
         } catch (Exception e) {
             log.error("处理 MQTT 消息失败: topic={}", topic, e);
@@ -68,6 +74,8 @@ public class MqttMessageHandler implements MqttCallback {
      */
     private void handleChargingData(String topic, String payload) {
         try {
+            log.info("开始处理充电数据: topic={}", topic);
+            
             // 解析主题获取 gunId
             Long gunId = parseGunIdFromTopic(topic);
             if (gunId == null) {
@@ -75,15 +83,20 @@ public class MqttMessageHandler implements MqttCallback {
                 return;
             }
             
+            log.info("解析到 gunId: {}", gunId);
+            
             // 解析充电数据
             ChargingDataVO data = JSON.parseObject(payload, ChargingDataVO.class);
+            log.info("解析充电数据成功: {}", data);
             
             // 获取充电会话ID
             Long sessionId = getActiveSessionByGunId(gunId);
             if (sessionId == null) {
-                log.debug("充电枪 {} 没有活跃会话", gunId);
+                log.warn("充电枪 {} 没有活跃会话，跳过推送", gunId);
                 return;
             }
+            
+            log.info("找到活跃会话: sessionId={}", sessionId);
             
             // 推送到 WebSocket
             webSocketService.pushChargingData(sessionId, data);
@@ -92,7 +105,7 @@ public class MqttMessageHandler implements MqttCallback {
             String cacheKey = "charging:data:" + sessionId;
             redisTemplate.opsForValue().set(cacheKey, data, Duration.ofMinutes(5));
             
-            log.debug("充电数据已推送: sessionId={}, data={}", sessionId, data);
+            log.info("充电数据已推送: sessionId={}, data={}", sessionId, data);
             
         } catch (Exception e) {
             log.error("处理充电数据失败: topic={}, payload={}", topic, payload, e);
@@ -104,6 +117,8 @@ public class MqttMessageHandler implements MqttCallback {
      */
     private void handleBmsData(String topic, String payload) {
         try {
+            log.info("开始处理 BMS 数据: topic={}", topic);
+            
             // 解析主题获取 vehicleId
             String vehicleId = parseVehicleIdFromTopic(topic);
             if (vehicleId == null) {
@@ -111,15 +126,20 @@ public class MqttMessageHandler implements MqttCallback {
                 return;
             }
             
+            log.info("解析到 vehicleId: {}", vehicleId);
+            
             // 解析 BMS 数据
             VehicleBmsDataVO data = JSON.parseObject(payload, VehicleBmsDataVO.class);
+            log.info("解析 BMS 数据成功: {}", data);
             
             // 获取充电会话ID
             Long sessionId = getActiveSessionByVehicleId(vehicleId);
             if (sessionId == null) {
-                log.debug("车辆 {} 没有活跃会话", vehicleId);
+                log.warn("车辆 {} 没有活跃会话，跳过推送", vehicleId);
                 return;
             }
+            
+            log.info("找到活跃会话: sessionId={}", sessionId);
             
             // 推送到 WebSocket
             webSocketService.pushBmsData(sessionId, data);
@@ -128,7 +148,7 @@ public class MqttMessageHandler implements MqttCallback {
             String cacheKey = "bms:data:" + sessionId;
             redisTemplate.opsForValue().set(cacheKey, data, Duration.ofMinutes(5));
             
-            log.debug("BMS 数据已推送: sessionId={}, data={}", sessionId, data);
+            log.info("BMS 数据已推送: sessionId={}, data={}", sessionId, data);
             
         } catch (Exception e) {
             log.error("处理 BMS 数据失败: topic={}, payload={}", topic, payload, e);
