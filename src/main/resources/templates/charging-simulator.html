@@ -11,6 +11,34 @@
             box-sizing: border-box;
         }
         
+        /* 自定义滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 52, 96, 0.3);
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg, #00d4ff 0%, #0099cc 100%);
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg, #00e5ff 0%, #00b8e6 100%);
+            box-shadow: 0 0 8px rgba(0, 212, 255, 0.5);
+        }
+        
+        /* Firefox 滚动条样式 */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: #00d4ff rgba(15, 52, 96, 0.3);
+        }
+        
         body {
             font-family: 'Microsoft YaHei', Arial, sans-serif;
             background: #1a1a2e;
@@ -22,8 +50,10 @@
         .simulator-container {
             display: flex;
             height: 100vh;
-            gap: 20px;
+            gap: 16px;
             padding: 20px;
+            background: #1a1a2e;
+            position: relative;
         }
         
         .left-panel, .right-panel {
@@ -32,6 +62,26 @@
             border-radius: 12px;
             padding: 24px;
             overflow-y: auto;
+            position: relative;
+        }
+        
+        /* 中间分隔线效果 */
+        .simulator-container::before {
+            content: '';
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            height: 85%;
+            width: 1px;
+            background: linear-gradient(180deg, 
+                transparent 0%, 
+                rgba(0, 212, 255, 0.2) 5%,
+                rgba(0, 212, 255, 0.5) 50%, 
+                rgba(0, 212, 255, 0.2) 95%,
+                transparent 100%);
+            pointer-events: none;
+            z-index: 1;
         }
         
         .right-panel.grayed-out {
@@ -73,15 +123,15 @@
         .control-buttons {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-            margin-bottom: 24px;
+            gap: 10px;
+            margin-bottom: 20px;
         }
         
         .btn {
-            padding: 14px;
+            padding: 10px 12px;
             border: none;
             border-radius: 8px;
-            font-size: 16px;
+            font-size: 14px;
             font-weight: bold;
             cursor: pointer;
             transition: all 0.3s;
@@ -145,7 +195,7 @@
         
         .data-display {
             background: #0f3460;
-            padding: 20px;
+            padding: 16px;
             border-radius: 8px;
         }
         
@@ -153,7 +203,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 12px 0;
+            padding: 10px 0;
             border-bottom: 1px solid rgba(255,255,255,0.1);
         }
         
@@ -163,17 +213,17 @@
         
         .data-label {
             color: #aaa;
-            font-size: 14px;
+            font-size: 13px;
         }
         
         .data-value {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: bold;
             color: #00d4ff;
         }
         
         .data-unit {
-            font-size: 14px;
+            font-size: 12px;
             color: #aaa;
             margin-left: 4px;
         }
@@ -199,9 +249,304 @@
             font-size: 14px;
             color: #00d4ff;
         }
+        
+        /* BMS 数据容器 */
+        .bms-container {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            background: #0f3460;
+            padding: 30px 20px;
+            border-radius: 12px;
+            min-height: 280px;
+        }
+        
+        .bms-left {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            min-width: 180px;
+        }
+        
+        .bms-data-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        .bms-label {
+            color: #aaa;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .bms-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00d4ff;
+        }
+        
+        .bms-unit {
+            font-size: 14px;
+            color: #aaa;
+            margin-left: 4px;
+        }
+        
+        /* 电池动画 */
+        .battery-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-left: 60px;
+        }
+        
+        .battery-pole {
+            width: 40px;
+            height: 15px;
+            background: linear-gradient(180deg, #555 0%, #333 100%);
+            border-radius: 8px 8px 0 0;
+            position: relative;
+        }
+        
+        .battery-pole::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 20px;
+            height: 8px;
+            background: #222;
+            border-radius: 2px;
+        }
+        
+        .battery-body {
+            width: 80px;
+            height: 200px;
+            background: linear-gradient(135deg, #1a2332 0%, #0f1923 100%);
+            border: 3px solid #00d4ff;
+            border-radius: 12px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 
+                0 0 20px rgba(0, 212, 255, 0.3),
+                inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        .battery-level {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 0%;
+            background: linear-gradient(180deg, 
+                #00ff88 0%, 
+                #00d4ff 50%, 
+                #0099cc 100%);
+            border-radius: 0 0 8px 8px;
+            overflow: hidden;
+        }
+        
+        .battery-level.low {
+            background: linear-gradient(180deg, 
+                #ff6b6b 0%, 
+                #ee5a6f 100%);
+        }
+        
+        .battery-level.medium {
+            background: linear-gradient(180deg, 
+                #ffd93d 0%, 
+                #f5a623 100%);
+        }
+        
+        .battery-liquid {
+            position: absolute;
+            top: -10px;
+            left: -50%;
+            width: 200%;
+            height: 20px;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 45%;
+            animation: wave 3s ease-in-out infinite;
+        }
+        
+        .battery-liquid::before,
+        .battery-liquid::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 45%;
+        }
+        
+        .battery-liquid::before {
+            animation: wave 4s ease-in-out infinite;
+        }
+        
+        .battery-liquid::after {
+            animation: wave 5s ease-in-out infinite reverse;
+        }
+        
+        @keyframes wave {
+            0%, 100% {
+                transform: translateX(0) translateY(0);
+            }
+            25% {
+                transform: translateX(-25%) translateY(-5px);
+            }
+            50% {
+                transform: translateX(0) translateY(0);
+            }
+            75% {
+                transform: translateX(25%) translateY(-5px);
+            }
+        }
+        
+        .battery-percentage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 
+                0 0 10px rgba(0, 0, 0, 0.8),
+                0 0 20px rgba(0, 212, 255, 0.5);
+            z-index: 10;
+        }
+        
+        /* 自定义确认对话框 */
+        .custom-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .custom-modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+            to {
+                opacity: 1;
+            }
+        }
+        
+        .modal-content {
+            background: rgba(22, 33, 62, 0.95);
+            border: 2px solid rgba(0, 212, 255, 0.6);
+            border-radius: 16px;
+            padding: 40px 32px 32px;
+            max-width: 400px;
+            width: 90%;
+            box-shadow: 
+                0 10px 40px rgba(0, 0, 0, 0.5),
+                0 0 30px rgba(0, 212, 255, 0.2);
+            animation: slideIn 0.3s ease;
+            position: relative;
+            backdrop-filter: blur(10px);
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-title {
+            color: #00d4ff;
+            font-size: 22px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .modal-message {
+            color: rgba(170, 170, 170, 0.9);
+            font-size: 15px;
+            text-align: center;
+            line-height: 1.8;
+            margin-bottom: 32px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .modal-btn {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .modal-btn-cancel {
+            background: rgba(42, 63, 95, 0.8);
+            color: #aaa;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .modal-btn-cancel:hover {
+            background: rgba(58, 79, 111, 0.9);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+        
+        .modal-btn-confirm {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.9) 0%, rgba(0, 153, 204, 0.9) 100%);
+            color: #fff;
+        }
+        
+        .modal-btn-confirm:hover {
+            background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4);
+        }
     </style>
 </head>
 <body>
+    <!-- 自定义确认对话框 -->
+    <div id="custom-modal" class="custom-modal">
+        <div class="modal-content">
+            <div class="modal-title">确认重置</div>
+            <div class="modal-message">确定要重置充电枪状态吗？<br>这将清除所有相关数据。</div>
+            <div class="modal-buttons">
+                <button class="modal-btn modal-btn-cancel" onclick="closeModal()">取消</button>
+                <button class="modal-btn modal-btn-confirm" onclick="confirmReset()">确定</button>
+            </div>
+        </div>
+    </div>
+    
     <div class="simulator-container">
         <!-- 左侧：充电站数据 -->
         <div class="left-panel">
@@ -271,34 +616,48 @@
         <!-- 右侧：车辆数据 -->
         <div class="right-panel grayed-out" id="vehicle-panel">
             <h2>车辆 BMS 数据</h2>
-            <div id="bms-data" class="data-display">
-                <div class="data-item">
-                    <span class="data-label">电池电压</span>
-                    <span>
-                        <span class="data-value" id="battery-voltage">--</span>
-                        <span class="data-unit">V</span>
-                    </span>
+            <div id="bms-data" class="bms-container">
+                <!-- 左侧数据 -->
+                <div class="bms-left">
+                    <div class="bms-data-item">
+                        <span class="bms-label">电池电压</span>
+                        <span class="bms-value">
+                            <span id="battery-voltage">--</span>
+                            <span class="bms-unit">V</span>
+                        </span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">电池电流</span>
+                        <span class="bms-value">
+                            <span id="battery-current">--</span>
+                            <span class="bms-unit">A</span>
+                        </span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">电池温度</span>
+                        <span class="bms-value">
+                            <span id="battery-temp">--</span>
+                            <span class="bms-unit">°C</span>
+                        </span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">SOC</span>
+                        <span class="bms-value">
+                            <span id="battery-soc">--</span>
+                            <span class="bms-unit">%</span>
+                        </span>
+                    </div>
                 </div>
-                <div class="data-item">
-                    <span class="data-label">电池电流</span>
-                    <span>
-                        <span class="data-value" id="battery-current">--</span>
-                        <span class="data-unit">A</span>
-                    </span>
-                </div>
-                <div class="data-item">
-                    <span class="data-label">电池温度</span>
-                    <span>
-                        <span class="data-value" id="battery-temp">--</span>
-                        <span class="data-unit">°C</span>
-                    </span>
-                </div>
-                <div class="data-item">
-                    <span class="data-label">SOC</span>
-                    <span>
-                        <span class="data-value" id="battery-soc">--</span>
-                        <span class="data-unit">%</span>
-                    </span>
+                
+                <!-- 右侧电池动画 -->
+                <div class="battery-container">
+                    <div class="battery-pole"></div>
+                    <div class="battery-body">
+                        <div class="battery-level" id="battery-level">
+                            <div class="battery-liquid"></div>
+                        </div>
+                        <div class="battery-percentage" id="battery-percentage">--</div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -647,10 +1006,27 @@
         
         // 重置充电枪状态
         function resetGun() {
-            if (!confirm('确定要重置充电枪状态吗？这将清除所有相关数据。')) {
-                return;
-            }
-            
+            showModal();
+        }
+        
+        // 显示自定义对话框
+        function showModal() {
+            document.getElementById('custom-modal').classList.add('show');
+        }
+        
+        // 关闭对话框
+        function closeModal() {
+            document.getElementById('custom-modal').classList.remove('show');
+        }
+        
+        // 确认重置
+        function confirmReset() {
+            closeModal();
+            executeReset();
+        }
+        
+        // 执行重置操作
+        function executeReset() {
             showStatus('正在重置充电枪...');
             
             fetch('/api/charging/reset?gunId=' + gunId, {
@@ -829,7 +1205,11 @@
                 document.getElementById('battery-temp').textContent = data.batteryTemp.toFixed(1);
             }
             if (data.soc !== undefined && data.soc !== null) {
-                document.getElementById('battery-soc').textContent = data.soc;
+                const soc = data.soc;
+                document.getElementById('battery-soc').textContent = soc;
+                
+                // 更新电池动画
+                updateBatteryAnimation(soc);
             }
             
             // 设置新的定时器，20秒后如果没有新数据则显示 --
@@ -838,8 +1218,40 @@
                 document.getElementById('battery-current').textContent = '--';
                 document.getElementById('battery-temp').textContent = '--';
                 document.getElementById('battery-soc').textContent = '--';
+                document.getElementById('battery-percentage').textContent = '--';
+                document.getElementById('battery-level').style.height = '0%';
                 console.log('BMS 数据超时，已重置显示');
             }, DATA_TIMEOUT);
+        }
+        
+        // 更新电池动画
+        function updateBatteryAnimation(soc) {
+            const batteryLevel = document.getElementById('battery-level');
+            const batteryPercentage = document.getElementById('battery-percentage');
+            
+            // 更新百分比显示
+            batteryPercentage.textContent = soc + '%';
+            
+            // 先重置到0
+            batteryLevel.style.transition = 'none';
+            batteryLevel.style.height = '0%';
+            
+            // 根据电量改变颜色
+            batteryLevel.classList.remove('low', 'medium');
+            if (soc <= 20) {
+                batteryLevel.classList.add('low');
+            } else if (soc <= 50) {
+                batteryLevel.classList.add('medium');
+            }
+            
+            // 使用 requestAnimationFrame 确保重置生效后再开始动画
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    // 添加过渡效果并上升到目标高度
+                    batteryLevel.style.transition = 'height 1s ease-out';
+                    batteryLevel.style.height = soc + '%';
+                });
+            });
         }
     </script>
 </body>

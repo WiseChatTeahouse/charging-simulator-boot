@@ -16,7 +16,7 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -69,46 +69,71 @@ public class StationService {
     
     /**
      * 查询站点详情（包含充电桩和充电枪）
-     * 不使用缓存，直接查询数据库以获取实时状态
+     * 使用连表查询优化，减少数据库查询次数
      */
     public StationDetailVO getStationDetail(Long stationId) {
-        Station station = stationMapper.selectById(stationId);
-        if (station == null) {
+        // 使用连表查询一次性获取所有数据
+        List<Map<String, Object>> rows = stationMapper.selectStationDetailWithPilesAndGuns(stationId);
+        
+        if (rows.isEmpty()) {
             throw new BusinessException("站点不存在");
         }
         
+        // 构建站点详情VO
+        Map<String, Object> firstRow = rows.get(0);
         StationDetailVO vo = new StationDetailVO();
-        BeanUtils.copyProperties(station, vo);
-        vo.setStatusText(getStationStatusText(station.getStatus()));
+        vo.setId(((Number) firstRow.get("station_id")).longValue());
+        vo.setName((String) firstRow.get("station_name"));
+        vo.setAddress((String) firstRow.get("station_address"));
+        Integer stationStatus = ((Number) firstRow.get("station_status")).intValue();
+        vo.setStatus(stationStatus);
+        vo.setStatusText(getStationStatusText(stationStatus));
         
-        // 查询充电桩列表
-        List<ChargingPile> piles = pileMapper.selectList(
-                new LambdaQueryWrapper<ChargingPile>()
-                        .eq(ChargingPile::getStationId, stationId)
-        );
+        // 使用Map来组织充电桩和充电枪的层级关系
+        Map<Long, ChargingPileDetailVO> pileMap = new LinkedHashMap<>();
         
-        // 为每个充电桩查询充电枪并转换为ChargingPileDetailVO
-        List<ChargingPileDetailVO> pileDetails = piles.stream()
-                .map(pile -> {
-                    ChargingPileDetailVO pileVO = new ChargingPileDetailVO();
-                    BeanUtils.copyProperties(pile, pileVO);
-                    pileVO.setStatusText(getPileStatusText(pile.getStatus()));
-                    
-                    // 查询该充电桩的充电枪
-                    List<ChargingGun> guns = gunMapper.selectList(
-                            new LambdaQueryWrapper<ChargingGun>()
-                                    .eq(ChargingGun::getPileId, pile.getId())
-                    );
-                    
-                    pileVO.setGuns(guns.stream()
-                            .map(this::convertToChargingGunVO)
-                            .collect(Collectors.toList()));
-                    
-                    return pileVO;
-                })
-                .collect(Collectors.toList());
+        for (Map<String, Object> row : rows) {
+            Object pileIdObj = row.get("pile_id");
+            if (pileIdObj == null) {
+                continue; // 站点没有充电桩
+            }
+            
+            Long pileId = ((Number) pileIdObj).longValue();
+            
+            // 如果充电桩不在Map中，创建新的充电桩VO
+            ChargingPileDetailVO pileVO = pileMap.get(pileId);
+            if (pileVO == null) {
+                pileVO = new ChargingPileDetailVO();
+                pileVO.setId(pileId);
+                pileVO.setPileCode((String) row.get("pile_code"));
+                Integer pileStatus = ((Number) row.get("pile_status")).intValue();
+                pileVO.setStatus(pileStatus);
+                pileVO.setStatusText(getPileStatusText(pileStatus));
+                pileVO.setStationId(vo.getId());
+                pileVO.setGuns(new ArrayList<>());
+                pileMap.put(pileId, pileVO);
+            }
+            
+            // 添加充电枪
+            Object gunIdObj = row.get("gun_id");
+            if (gunIdObj != null) {
+                Long gunId = ((Number) gunIdObj).longValue();
+                ChargingGunVO gunVO = new ChargingGunVO();
+                gunVO.setId(gunId);
+                gunVO.setGunCode((String) row.get("gun_code"));
+                Integer gunType = ((Number) row.get("gun_type")).intValue();
+                gunVO.setType(gunType);
+                gunVO.setTypeText(getGunTypeText(gunType));
+                Integer gunStatus = ((Number) row.get("gun_status")).intValue();
+                gunVO.setStatus(gunStatus);
+                gunVO.setStatusText(getGunStatusText(gunStatus));
+                gunVO.setPileId(pileId);
+                
+                pileVO.getGuns().add(gunVO);
+            }
+        }
         
-        vo.setPiles(pileDetails);
+        vo.setPiles(new ArrayList<>(pileMap.values()));
         
         return vo;
     }
