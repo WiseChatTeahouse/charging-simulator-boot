@@ -63,7 +63,15 @@ INSERT INTO t_charging_pile (id, station_id, pile_code, status) VALUES
 (1, 1, 'BJ-CY-001', 1),
 (2, 1, 'BJ-CY-002', 1),
 (3, 2, 'SH-PD-001', 1),
-(4, 2, 'SH-PD-002', 1);
+(4, 2, 'SH-PD-002', 1),
+(5, 1, 'BJ-CY-003', 1),
+(6, 1, 'BJ-CY-004', 1),
+(7, 1, 'BJ-CY-005', 1),
+(8, 1, 'BJ-CY-006', 1),
+(9, 2, 'SH-PD-003', 1),
+(10, 2, 'SH-PD-004', 1),
+(11, 2, 'SH-PD-005', 1),
+(12, 2, 'SH-PD-006', 1);
 
 -- 插入充电枪数据
 INSERT INTO t_charging_gun (id, pile_id, gun_code, type, status) VALUES
@@ -74,4 +82,20 @@ INSERT INTO t_charging_gun (id, pile_id, gun_code, type, status) VALUES
 (5, 3, 'SH-PD-001-A', 1, 0),
 (6, 3, 'SH-PD-001-B', 1, 0),
 (7, 4, 'SH-PD-002-A', 1, 0),
-(8, 4, 'SH-PD-002-B', 2, 0);
+(8, 4, 'SH-PD-002-B', 2, 0),
+(9, 5, 'BJ-CY-003-A', 1, 0),
+(10, 5, 'BJ-CY-003-B', 1, 0),
+(11, 6, 'BJ-CY-004-A', 1, 0),
+(12, 6, 'BJ-CY-004-B', 2, 0),
+(13, 7, 'BJ-CY-005-A', 1, 0),
+(14, 7, 'BJ-CY-005-B', 1, 0),
+(15, 8, 'BJ-CY-006-A', 1, 0),
+(16, 8, 'BJ-CY-006-B', 2, 0),
+(17, 9, 'SH-PD-003-A', 1, 0),
+(18, 9, 'SH-PD-003-B', 1, 0),
+(19, 10, 'SH-PD-004-A', 1, 0),
+(20, 10, 'SH-PD-004-B', 2, 0),
+(21, 11, 'SH-PD-005-A', 1, 0),
+(22, 11, 'SH-PD-005-B', 1, 0),
+(23, 12, 'SH-PD-006-A', 1, 0),
+(24, 12, 'SH-PD-006-B', 2, 0);
