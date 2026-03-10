@@ -758,7 +758,7 @@
                         const pileDetail = result.data;
                         const gun = pileDetail.guns.find(g => g.id == gunId);
                         if (gun) {
-                            document.getElementById('gun-code').textContent = gun.code;
+                            document.getElementById('gun-code').textContent = gun.gunCode;
                             document.getElementById('gun-type').textContent = gun.typeText;
                         }
                     }
@@ -781,7 +781,7 @@
                         // 查找当前充电枪
                         const gun = pileDetail.guns.find(g => g.id == gunId);
                         if (gun) {
-                            document.getElementById('gun-code').textContent = gun.code;
+                            document.getElementById('gun-code').textContent = gun.gunCode;
                             document.getElementById('gun-type').textContent = gun.typeText;
                             document.getElementById('gun-status').textContent = gun.statusText;
                             
