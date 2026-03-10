@@ -24,81 +24,130 @@ import java.util.concurrent.CopyOnWriteArraySet;
 @Service
 public class WebSocketService {
     
-    // 充电会话ID -> WebSocket会话集合
+    // 充电枪ID -> WebSocket会话集合
     private final Map<Long, Set<WebSocketSession>> sessionMap = new ConcurrentHashMap<>();
     
     /**
      * 注册 WebSocket 会话
      */
-    public void registerSession(Long chargingSessionId, WebSocketSession wsSession) {
-        sessionMap.computeIfAbsent(chargingSessionId, k -> new CopyOnWriteArraySet<>())
+    public void registerSession(Long gunId, WebSocketSession wsSession) {
+        sessionMap.computeIfAbsent(gunId, k -> new CopyOnWriteArraySet<>())
                 .add(wsSession);
-        log.info("注册 WebSocket 会话: chargingSessionId={}, wsSessionId={}, 当前连接数={}", 
-                chargingSessionId, wsSession.getId(), sessionMap.get(chargingSessionId).size());
+        log.info("注册 WebSocket 会话: gunId={}, wsSessionId={}, 当前连接数={}", 
+                gunId, wsSession.getId(), sessionMap.get(gunId).size());
     }
     
     /**
      * 注销 WebSocket 会话
      */
-    public void unregisterSession(Long chargingSessionId, WebSocketSession wsSession) {
-        Set<WebSocketSession> sessions = sessionMap.get(chargingSessionId);
+    public void unregisterSession(Long gunId, WebSocketSession wsSession) {
+        Set<WebSocketSession> sessions = sessionMap.get(gunId);
         if (sessions != null) {
             sessions.remove(wsSession);
             if (sessions.isEmpty()) {
-                sessionMap.remove(chargingSessionId);
+                sessionMap.remove(gunId);
             }
-            log.info("注销 WebSocket 会话: chargingSessionId={}, wsSessionId={}", 
-                    chargingSessionId, wsSession.getId());
+            log.info("注销 WebSocket 会话: gunId={}, wsSessionId={}", 
+                    gunId, wsSession.getId());
         }
     }
     
     /**
      * 推送充电数据
      */
-    public void pushChargingData(Long chargingSessionId, ChargingDataVO data) {
+    public void pushChargingData(Long gunId, ChargingDataVO data) {
         WebSocketMessage message = new WebSocketMessage();
         message.setType("CHARGING_DATA");
         message.setData(data);
         
-        pushMessage(chargingSessionId, message);
+        pushMessage(gunId, message);
     }
     
     /**
      * 推送 BMS 数据
      */
-    public void pushBmsData(Long chargingSessionId, VehicleBmsDataVO data) {
+    public void pushBmsData(Long gunId, VehicleBmsDataVO data) {
         WebSocketMessage message = new WebSocketMessage();
         message.setType("BMS_DATA");
         message.setData(data);
         
-        pushMessage(chargingSessionId, message);
+        pushMessage(gunId, message);
     }
     
     /**
-     * 推送消息到指定会话的所有 WebSocket 连接
+     * 推送消息到指定充电枪的所有 WebSocket 连接
      */
-    private void pushMessage(Long chargingSessionId, WebSocketMessage message) {
-        Set<WebSocketSession> sessions = sessionMap.get(chargingSessionId);
+    private void pushMessage(Long gunId, WebSocketMessage message) {
+        Set<WebSocketSession> sessions = sessionMap.get(gunId);
         if (sessions == null || sessions.isEmpty()) {
-            log.debug("没有找到会话的 WebSocket 连接: chargingSessionId={}", chargingSessionId);
+            log.debug("没有找到充电枪的 WebSocket 连接: gunId={}", gunId);
             return;
         }
         
         String jsonMessage = JSON.toJSONString(message);
         TextMessage textMessage = new TextMessage(jsonMessage);
         
-        sessions.forEach(session -> {
+        // 使用迭代器安全地遍历和移除无效连接
+        sessions.removeIf(session -> {
             try {
                 if (session.isOpen()) {
                     session.sendMessage(textMessage);
-                    log.debug("推送消息成功: chargingSessionId={}, wsSessionId={}, type={}", 
-                            chargingSessionId, session.getId(), message.getType());
+                    log.debug("推送消息成功: gunId={}, wsSessionId={}, type={}", 
+                            gunId, session.getId(), message.getType());
+                    return false; // 保留有效连接
+                } else {
+                    log.debug("移除已关闭的 WebSocket 连接: gunId={}, wsSessionId={}", 
+                            gunId, session.getId());
+                    return true; // 移除无效连接
                 }
             } catch (IOException e) {
-                log.error("推送消息失败: chargingSessionId={}, wsSessionId={}", 
-                        chargingSessionId, session.getId(), e);
+                log.error("推送消息失败，移除连接: gunId={}, wsSessionId={}", 
+                        gunId, session.getId(), e);
+                return true; // 移除异常连接
             }
         });
+        
+        // 如果所有连接都被移除，清理map
+        if (sessions.isEmpty()) {
+            sessionMap.remove(gunId);
+        }
+    }
+    
+    /**
+     * 获取指定充电枪的连接数
+     */
+    public int getConnectionCount(Long gunId) {
+        Set<WebSocketSession> sessions = sessionMap.get(gunId);
+        return sessions != null ? sessions.size() : 0;
+    }
+    
+    /**
+     * 获取所有活跃连接数
+     */
+    public int getTotalConnectionCount() {
+        return sessionMap.values().stream()
+                .mapToInt(Set::size)
+                .sum();
+    }
+    
+    /**
+     * 清除指定充电枪的所有连接
+     */
+    public void clearGunSessions(Long gunId) {
+        Set<WebSocketSession> sessions = sessionMap.remove(gunId);
+        if (sessions != null) {
+            sessions.forEach(session -> {
+                try {
+                    if (session.isOpen()) {
+                        session.close();
+                    }
+                } catch (Exception e) {
+                    log.error("关闭 WebSocket 连接失败: gunId={}, wsSessionId={}", 
+                            gunId, session.getId(), e);
+                }
+            });
+            log.info("清除充电枪 {} 的所有 WebSocket 连接，数量: {}", gunId, sessions.size());
+        }
     }
     
     /**

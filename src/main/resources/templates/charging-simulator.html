@@ -704,8 +704,8 @@
         
         // 恢复会话状态
         function restoreSessionState(sessionData) {
-            // 设置sessionId
-            sessionId = sessionData.id;
+            // 设置sessionId（现在就是gunId）
+            sessionId = sessionData.gunId;
             
             // 先加载充电枪基本信息（编号、类型）
             loadGunBasicInfo();
@@ -716,21 +716,15 @@
             
             document.getElementById('gun-status').textContent = statusText;
             
-            if (status === 0) {
+            if (status === 1) {
                 // 已插枪状态
-                document.getElementById('btn-insert-gun').disabled = true;
-                document.getElementById('btn-start-charging').disabled = false;
-                document.getElementById('btn-stop-charging').disabled = true;
-                document.getElementById('btn-remove-gun').disabled = true;
-                showStatus('检测到已插枪状态，会话ID: ' + sessionId);
-            } else if (status === 1) {
+                updateButtonsByGunStatus(1); // 使用统一的状态更新函数
+                showStatus('检测到已插枪状态，枪ID: ' + sessionId);
+            } else if (status === 2) {
                 // 充电中状态
                 isCharging = true; // 设置充电状态
                 
-                document.getElementById('btn-insert-gun').disabled = true;
-                document.getElementById('btn-start-charging').disabled = true;
-                document.getElementById('btn-stop-charging').disabled = false;
-                document.getElementById('btn-remove-gun').disabled = true;
+                updateButtonsByGunStatus(2); // 使用统一的状态更新函数
                 
                 // 右侧面板变为正常显示
                 document.getElementById('vehicle-panel').classList.remove('grayed-out');
@@ -739,13 +733,6 @@
                 
                 // 自动建立WebSocket连接
                 connectWebSocket();
-            } else if (status === 2) {
-                // 已结束状态
-                document.getElementById('btn-insert-gun').disabled = true;
-                document.getElementById('btn-start-charging').disabled = true;
-                document.getElementById('btn-stop-charging').disabled = true;
-                document.getElementById('btn-remove-gun').disabled = false;
-                showStatus('检测到充电已结束状态');
             }
         }
         
@@ -801,7 +788,7 @@
         
         // 根据充电枪状态更新按钮
         function updateButtonsByGunStatus(status) {
-            // status: 0=空闲, 1=充电中, 2=故障
+            // status: 0=空闲, 1=已插枪, 2=充电中, 3=故障
             const btnInsert = document.getElementById('btn-insert-gun');
             const btnStart = document.getElementById('btn-start-charging');
             const btnStop = document.getElementById('btn-stop-charging');
@@ -814,6 +801,13 @@
                 btnStop.disabled = true;
                 btnRemove.disabled = true;
             } else if (status === 1) {
+                // 已插枪状态：可以启动充电或拔枪
+                btnInsert.disabled = true;
+                btnStart.disabled = false;
+                btnStop.disabled = true;
+                btnRemove.disabled = false;
+                showStatus('充电枪已插枪，可以启动充电');
+            } else if (status === 2) {
                 // 充电中状态：只能结束充电
                 btnInsert.disabled = true;
                 btnStart.disabled = true;
@@ -854,12 +848,11 @@
             .then(result => {
                 console.log('插枪响应:', result);
                 if (result.code === 200) {
-                    sessionId = result.data;
-                    showStatus('插枪成功！会话ID: ' + sessionId);
+                    sessionId = result.data; // 现在返回的是gunId
+                    showStatus('插枪成功！枪ID: ' + sessionId);
                     
-                    // 更新按钮状态
-                    document.getElementById('btn-insert-gun').disabled = true;
-                    document.getElementById('btn-start-charging').disabled = false;
+                    // 更新按钮状态 - 已插枪状态
+                    updateButtonsByGunStatus(1); // 使用统一的状态更新函数
                     document.getElementById('gun-status').textContent = '已插枪';
                 } else {
                     showStatus('插枪失败: ' + result.message, true);
@@ -894,9 +887,8 @@
                     // 设置充电状态
                     isCharging = true;
                     
-                    // 更新按钮状态
-                    document.getElementById('btn-start-charging').disabled = true;
-                    document.getElementById('btn-stop-charging').disabled = false;
+                    // 更新按钮状态 - 充电中状态
+                    updateButtonsByGunStatus(2); // 使用统一的状态更新函数
                     document.getElementById('gun-status').textContent = '充电中';
                     
                     // 右侧面板变为正常显示
@@ -938,10 +930,9 @@
                     // 清除充电状态
                     isCharging = false;
                     
-                    // 更新按钮状态
-                    document.getElementById('btn-stop-charging').disabled = true;
-                    document.getElementById('btn-remove-gun').disabled = false;
-                    document.getElementById('gun-status').textContent = '已结束';
+                    // 更新按钮状态 - 已插枪状态（充电结束但未拔枪）
+                    updateButtonsByGunStatus(1); // 使用统一的状态更新函数
+                    document.getElementById('gun-status').textContent = '已插枪'; // 状态回到已插枪
                     
                     // 断开 WebSocket
                     if (ws) {
@@ -981,12 +972,9 @@
                     // 清除充电状态
                     isCharging = false;
                     
-                    // 重置状态
+                    // 重置状态 - 空闲状态
                     sessionId = null;
-                    document.getElementById('btn-insert-gun').disabled = false;
-                    document.getElementById('btn-start-charging').disabled = true;
-                    document.getElementById('btn-stop-charging').disabled = true;
-                    document.getElementById('btn-remove-gun').disabled = true;
+                    updateButtonsByGunStatus(0); // 使用统一的状态更新函数
                     document.getElementById('gun-status').textContent = '空闲';
                     
                     // 右侧面板变为置灰
@@ -1113,7 +1101,8 @@
                 return;
             }
             
-            const wsUrl = 'ws://' + window.location.host + '/ws/charging/' + sessionId;
+            // 现在使用gunId作为WebSocket路径参数
+            const wsUrl = 'ws://' + window.location.host + '/ws/charging/' + gunId;
             console.log('连接 WebSocket:', wsUrl);
             
             ws = new WebSocket(wsUrl);

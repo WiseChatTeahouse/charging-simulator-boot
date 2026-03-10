@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.*;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.stream.Collectors;
 
 /**
@@ -39,11 +40,14 @@ public class StationService {
     @Autowired
     private ChargingGunMapper gunMapper;
     
-    // Caffeine 本地缓存
+    // Caffeine 本地缓存 - 增加缓存大小并添加锁保证原子性
     private final Cache<String, Object> cache = Caffeine.newBuilder()
-            .maximumSize(1000)
+            .maximumSize(5000)  // 增加缓存大小
             .expireAfterWrite(10, TimeUnit.MINUTES)
             .build();
+    
+    // 读写锁保证缓存操作的原子性
+    private final ReentrantReadWriteLock cacheLock = new ReentrantReadWriteLock();
     
     /**
      * 查询所有站点
@@ -51,20 +55,41 @@ public class StationService {
     public List<StationVO> listStations() {
         String cacheKey = "stations:all";
         
-        @SuppressWarnings("unchecked")
-        List<StationVO> cached = (List<StationVO>) cache.getIfPresent(cacheKey);
-        if (cached != null) {
-            log.info("从缓存获取站点列表");
-            return cached;
+        // 使用读锁获取缓存
+        cacheLock.readLock().lock();
+        try {
+            @SuppressWarnings("unchecked")
+            List<StationVO> cached = (List<StationVO>) cache.getIfPresent(cacheKey);
+            if (cached != null) {
+                log.info("从缓存获取站点列表");
+                return cached;
+            }
+        } finally {
+            cacheLock.readLock().unlock();
         }
         
-        List<Station> stations = stationMapper.selectList(null);
-        List<StationVO> result = stations.stream()
-                .map(this::convertToStationVO)
-                .collect(Collectors.toList());
-        
-        cache.put(cacheKey, result);
-        return result;
+        // 使用写锁更新缓存
+        cacheLock.writeLock().lock();
+        try {
+            // 双重检查，防止并发时重复查询
+            @SuppressWarnings("unchecked")
+            List<StationVO> cached = (List<StationVO>) cache.getIfPresent(cacheKey);
+            if (cached != null) {
+                log.info("从缓存获取站点列表（双重检查）");
+                return cached;
+            }
+            
+            List<Station> stations = stationMapper.selectList(null);
+            List<StationVO> result = stations.stream()
+                    .map(this::convertToStationVO)
+                    .collect(Collectors.toList());
+            
+            cache.put(cacheKey, result);
+            log.info("查询并缓存站点列表，数量: {}", result.size());
+            return result;
+        } finally {
+            cacheLock.writeLock().unlock();
+        }
     }
     
     /**
@@ -180,8 +205,26 @@ public class StationService {
      */
     public void clearPileDetailCache(Long pileId) {
         String cacheKey = "pile:detail:" + pileId;
-        cache.invalidate(cacheKey);
-        log.info("清除充电桩详情缓存: {}", pileId);
+        cacheLock.writeLock().lock();
+        try {
+            cache.invalidate(cacheKey);
+            log.info("清除充电桩详情缓存: {}", pileId);
+        } finally {
+            cacheLock.writeLock().unlock();
+        }
+    }
+    
+    /**
+     * 清除所有缓存
+     */
+    public void clearAllCache() {
+        cacheLock.writeLock().lock();
+        try {
+            cache.invalidateAll();
+            log.info("清除所有缓存");
+        } finally {
+            cacheLock.writeLock().unlock();
+        }
     }
     
     private StationVO convertToStationVO(Station station) {
@@ -221,8 +264,9 @@ public class StationService {
     private String getGunStatusText(Integer status) {
         switch (status) {
             case 0: return "空闲";
-            case 1: return "充电中";
-            case 2: return "故障";
+            case 1: return "已插枪";
+            case 2: return "充电中";
+            case 3: return "故障";
             default: return "未知";
         }
     }

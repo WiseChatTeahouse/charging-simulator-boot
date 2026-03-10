@@ -1,39 +1,36 @@
-package chat.wisechat.charging.entity;
+package chat.wisechat.charging.vo;
 
-import com.baomidou.mybatisplus.annotation.IdType;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 /**
- * 充电枪实体类
+ * 充电枪会话 VO
  *
  * @author siberia.hu
  * @date 2026/3/3
  */
 @Data
-@TableName("t_charging_gun")
-public class ChargingGun {
+public class ChargingGunSessionVO {
     
-    @TableId(type = IdType.AUTO)
-    private Long id;
-    
-    private Long pileId;
+    private Long gunId;
     
     private String gunCode;
     
     private Integer type;
+    
+    private String typeText;
     
     /**
      * 状态：0-空闲，1-已插枪，2-充电中，3-故障
      */
     private Integer status;
     
+    private String statusText;
+    
     /**
-     * 车辆ID（插枪时设置）
+     * 车辆ID
      */
     private String vehicleId;
     
@@ -52,7 +49,8 @@ public class ChargingGun {
      */
     private BigDecimal totalPower;
     
-    private LocalDateTime createTime;
-    
-    private LocalDateTime updateTime;
+    /**
+     * 充电时长（分钟）
+     */
+    private Long chargingDuration;
 }

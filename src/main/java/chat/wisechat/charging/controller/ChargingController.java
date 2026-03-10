@@ -7,7 +7,7 @@ import chat.wisechat.charging.dto.StartChargingRequest;
 import chat.wisechat.charging.dto.StopChargingRequest;
 import chat.wisechat.charging.service.ChargingService;
 import chat.wisechat.charging.vo.ChargingResultVO;
-import chat.wisechat.charging.vo.ChargingSessionVO;
+import chat.wisechat.charging.vo.ChargingGunSessionVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -41,8 +41,8 @@ public class ChargingController {
             return Result.error("车辆ID不能为空");
         }
         
-        Long sessionId = chargingService.insertGun(request.getGunId(), request.getVehicleId());
-        return Result.success(sessionId);
+        Long gunId = chargingService.insertGun(request.getGunId(), request.getVehicleId());
+        return Result.success(gunId);
     }
     
     /**
@@ -52,11 +52,13 @@ public class ChargingController {
     public Result<Void> startCharging(@RequestBody StartChargingRequest request) {
         log.info("启动充电请求: {}", request);
         
-        if (request.getSessionId() == null || request.getSessionId() <= 0) {
-            return Result.error("会话ID无效");
+        // 兼容旧接口：如果传入sessionId，则当作gunId处理
+        Long gunId = request.getSessionId();
+        if (gunId == null || gunId <= 0) {
+            return Result.error("充电枪ID无效");
         }
         
-        chargingService.startCharging(request.getSessionId());
+        chargingService.startCharging(gunId);
         return Result.success();
     }
     
@@ -67,11 +69,13 @@ public class ChargingController {
     public Result<ChargingResultVO> stopCharging(@RequestBody StopChargingRequest request) {
         log.info("结束充电请求: {}", request);
         
-        if (request.getSessionId() == null || request.getSessionId() <= 0) {
-            return Result.error("会话ID无效");
+        // 兼容旧接口：如果传入sessionId，则当作gunId处理
+        Long gunId = request.getSessionId();
+        if (gunId == null || gunId <= 0) {
+            return Result.error("充电枪ID无效");
         }
         
-        ChargingResultVO result = chargingService.stopCharging(request.getSessionId());
+        ChargingResultVO result = chargingService.stopCharging(gunId);
         return Result.success(result);
     }
     
@@ -82,26 +86,29 @@ public class ChargingController {
     public Result<Void> removeGun(@RequestBody RemoveGunRequest request) {
         log.info("拔枪请求: {}", request);
         
-        if (request.getSessionId() == null || request.getSessionId() <= 0) {
-            return Result.error("会话ID无效");
+        // 兼容旧接口：如果传入sessionId，则当作gunId处理
+        Long gunId = request.getSessionId();
+        if (gunId == null || gunId <= 0) {
+            return Result.error("充电枪ID无效");
         }
         
-        chargingService.removeGun(request.getSessionId());
+        chargingService.removeGun(gunId);
         return Result.success();
     }
     
     /**
-     * 获取充电会话状态
+     * 获取充电会话状态（兼容旧接口）
      */
     @GetMapping("/session/{sessionId}")
-    public Result<ChargingSessionVO> getSessionStatus(@PathVariable Long sessionId) {
+    public Result<ChargingGunSessionVO> getSessionStatus(@PathVariable Long sessionId) {
         log.info("查询会话状态: {}", sessionId);
         
         if (sessionId == null || sessionId <= 0) {
-            return Result.error("会话ID无效");
+            return Result.error("充电枪ID无效");
         }
         
-        ChargingSessionVO session = chargingService.getSessionStatus(sessionId);
+        // sessionId现在就是gunId
+        ChargingGunSessionVO session = chargingService.getSessionStatus(sessionId);
         return Result.success(session);
     }
     
@@ -109,14 +116,14 @@ public class ChargingController {
      * 根据充电枪ID获取活跃会话
      */
     @GetMapping("/active-session")
-    public Result<ChargingSessionVO> getActiveSession(@RequestParam Long gunId) {
+    public Result<ChargingGunSessionVO> getActiveSession(@RequestParam Long gunId) {
         log.info("查询充电枪活跃会话: gunId={}", gunId);
         
         if (gunId == null || gunId <= 0) {
             return Result.error("充电枪ID无效");
         }
         
-        ChargingSessionVO session = chargingService.getActiveSessionByGunId(gunId);
+        ChargingGunSessionVO session = chargingService.getActiveSessionByGunId(gunId);
         return Result.success(session);
     }
     

@@ -24,17 +24,17 @@ public class ChargingWebSocketHandler extends TextWebSocketHandler {
     @Autowired
     private WebSocketService webSocketService;
     
-    private static final Pattern SESSION_ID_PATTERN = Pattern.compile("/ws/charging/(\\d+)");
+    private static final Pattern GUN_ID_PATTERN = Pattern.compile("/ws/charging/(\\d+)");
     
     @Override
     public void afterConnectionEstablished(WebSocketSession session) {
         try {
-            Long sessionId = parseSessionId(session);
-            if (sessionId != null) {
-                webSocketService.registerSession(sessionId, session);
-                log.info("WebSocket 连接建立: sessionId={}, wsSessionId={}", sessionId, session.getId());
+            Long gunId = parseGunId(session);
+            if (gunId != null) {
+                webSocketService.registerSession(gunId, session);
+                log.info("WebSocket 连接建立: gunId={}, wsSessionId={}", gunId, session.getId());
             } else {
-                log.warn("无法解析会话ID，关闭连接: {}", session.getUri());
+                log.warn("无法解析充电枪ID，关闭连接: {}", session.getUri());
                 session.close();
             }
         } catch (Exception e) {
@@ -45,22 +45,29 @@ public class ChargingWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
         try {
-            Long sessionId = parseSessionId(session);
-            if (sessionId != null) {
-                webSocketService.unregisterSession(sessionId, session);
-                log.info("WebSocket 连接关闭: sessionId={}, wsSessionId={}, status={}", 
-                        sessionId, session.getId(), status);
+            Long gunId = parseGunId(session);
+            if (gunId != null) {
+                webSocketService.unregisterSession(gunId, session);
+                log.info("WebSocket 连接关闭: gunId={}, wsSessionId={}, status={}", 
+                        gunId, session.getId(), status);
             }
         } catch (Exception e) {
             log.error("处理 WebSocket 关闭失败", e);
         }
     }
     
-    private Long parseSessionId(WebSocketSession session) {
+    private Long parseGunId(WebSocketSession session) {
+        if (session.getUri() == null) {
+            return null;
+        }
         String uri = session.getUri().toString();
-        Matcher matcher = SESSION_ID_PATTERN.matcher(uri);
+        Matcher matcher = GUN_ID_PATTERN.matcher(uri);
         if (matcher.find()) {
-            return Long.parseLong(matcher.group(1));
+            try {
+                return Long.parseLong(matcher.group(1));
+            } catch (NumberFormatException e) {
+                log.error("解析充电枪ID失败: {}", matcher.group(1), e);
+            }
         }
         return null;
     }
