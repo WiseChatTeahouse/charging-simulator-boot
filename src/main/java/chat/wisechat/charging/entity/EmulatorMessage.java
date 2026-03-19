@@ -13,7 +13,7 @@ public class EmulatorMessage {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Integer groupId;
+    private Long groupId;
 
     private Integer stepOrder;
 
