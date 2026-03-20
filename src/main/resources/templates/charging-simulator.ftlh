@@ -648,8 +648,7 @@
             .then(response => response.json())
             .then(result => {
                 if (result.code === 200) {
-                    const r = result.data;
-                    showStatus('充电结束！总电量: ' + r.totalPower + ' kWh, 时长: ' + r.chargingDuration + ' 分钟');
+                    showStatus('充电已结束');
                     isCharging = false;
                     updateButtonsByGunStatus(1);
                     document.getElementById('gun-status').textContent = '已插枪';
