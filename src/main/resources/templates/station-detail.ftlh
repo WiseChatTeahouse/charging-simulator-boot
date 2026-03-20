@@ -184,9 +184,8 @@
     </div>
 
     <script>
-        const stationId = window.location.pathname.split('/').pop();
+        const stationId = ${stationId};
         
-        // 加载站点详情
         function loadStationDetail() {
             fetch('/api/stations/' + stationId)
                 .then(response => response.json())
@@ -203,7 +202,6 @@
                 });
         }
         
-        // 渲染站点详情
         function renderStationDetail(station) {
             document.getElementById('station-name').textContent = station.name;
             document.getElementById('station-address').textContent = station.address || '暂无地址';
@@ -215,49 +213,42 @@
                 return;
             }
             
-            // 直接渲染充电桩（已包含充电枪信息）
             renderPiles(station.piles);
         }
         
-        // 渲染充电桩列表
         function renderPiles(piles) {
             const container = document.getElementById('pile-list');
             
-            container.innerHTML = piles.map(pile => `
-                <div class="pile-card">
-                    <div class="pile-header">
-                        <div class="pile-code">${pile.pileCode}</div>
-                        <span class="pile-status ${pile.status === 1 ? 'status-normal' : 'status-fault'}">
-                            ${pile.statusText}
-                        </span>
-                    </div>
-                    <div class="gun-list">
-                        ${renderGuns(pile.guns || [])}
-                    </div>
-                </div>
-            `).join('');
+            container.innerHTML = piles.map(function(pile) {
+                var statusClass = pile.status === 1 ? 'status-normal' : 'status-fault';
+                var guns = pile.guns ? pile.guns : [];
+                return '<div class="pile-card">'
+                    + '<div class="pile-header">'
+                    + '<div class="pile-code">' + pile.pileCode + '</div>'
+                    + '<span class="pile-status ' + statusClass + '">' + pile.statusText + '</span>'
+                    + '</div>'
+                    + '<div class="gun-list">' + renderGuns(guns) + '</div>'
+                    + '</div>';
+            }).join('');
         }
         
-        // 渲染充电枪列表
         function renderGuns(guns) {
             if (!guns || guns.length === 0) {
                 return '<div style="text-align: center; color: #999;">暂无充电枪</div>';
             }
             
-            return guns.map(gun => `
-                <div class="gun-item" onclick="viewGun(${gun.id})">
-                    <div class="gun-info">
-                        <div class="gun-code">${gun.gunCode}</div>
-                        <div class="gun-type">${gun.typeText}</div>
-                    </div>
-                    <span class="gun-status gun-status-${getGunStatusClass(gun.status)}">
-                        ${gun.statusText}
-                    </span>
-                </div>
-            `).join('');
+            return guns.map(function(gun) {
+                var statusClass = 'gun-status-' + getGunStatusClass(gun.status);
+                return '<div class="gun-item" onclick="viewGun(' + gun.id + ')">'
+                    + '<div class="gun-info">'
+                    + '<div class="gun-code">' + gun.gunCode + '</div>'
+                    + '<div class="gun-type">' + gun.typeText + '</div>'
+                    + '</div>'
+                    + '<span class="gun-status ' + statusClass + '">' + gun.statusText + '</span>'
+                    + '</div>';
+            }).join('');
         }
         
-        // 获取充电枪状态样式类
         function getGunStatusClass(status) {
             switch(status) {
                 case 0: return 'idle';
@@ -267,12 +258,10 @@
             }
         }
         
-        // 查看充电枪（跳转到充电模拟器）
         function viewGun(gunId) {
             window.location.href = '/charging/' + gunId;
         }
         
-        // 页面加载时获取站点详情
         window.onload = loadStationDetail;
     </script>
 </body>

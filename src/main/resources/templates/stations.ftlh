@@ -107,7 +107,6 @@
     </div>
 
     <script>
-        // 加载站点列表
         function loadStations() {
             fetch('/api/stations')
                 .then(response => response.json())
@@ -124,7 +123,6 @@
                 });
         }
         
-        // 渲染站点列表
         function renderStations(stations) {
             const container = document.getElementById('station-list');
             
@@ -133,29 +131,26 @@
                 return;
             }
             
-            container.innerHTML = stations.map(station => `
-                <div class="station-card" onclick="viewStation(${station.id})">
-                    <div class="station-name">${station.name}</div>
-                    <div class="station-address">${station.address || '暂无地址'}</div>
-                    <span class="station-status ${station.status === 1 ? 'status-active' : 'status-inactive'}">
-                        ${station.statusText}
-                    </span>
-                </div>
-            `).join('');
+            container.innerHTML = stations.map(function(station) {
+                var address = station.address ? station.address : '暂无地址';
+                var statusClass = station.status === 1 ? 'status-active' : 'status-inactive';
+                return '<div class="station-card" onclick="viewStation(' + station.id + ')">'
+                    + '<div class="station-name">' + station.name + '</div>'
+                    + '<div class="station-address">' + address + '</div>'
+                    + '<span class="station-status ' + statusClass + '">' + station.statusText + '</span>'
+                    + '</div>';
+            }).join('');
         }
         
-        // 查看站点详情
         function viewStation(stationId) {
             window.location.href = '/station/' + stationId;
         }
         
-        // 显示错误
         function showError(message) {
             const container = document.getElementById('station-list');
-            container.innerHTML = `<div class="error">${message}</div>`;
+            container.innerHTML = '<div class="error">' + message + '</div>';
         }
         
-        // 页面加载时获取站点列表
         window.onload = loadStations;
     </script>
 </body>

@@ -17,11 +17,13 @@ spring:
       port: 6379
       database: 0
       timeout: 3000ms
-  thymeleaf:
+  freemarker:
     cache: true
-    prefix: classpath:/templates/
-    suffix: .html
-    encoding: UTF-8
+    template-loader-path: classpath:/templates/
+    suffix: .ftlh
+    charset: UTF-8
+    settings:
+      number_format: "0.######"
 
 
 # MQTT 配置
