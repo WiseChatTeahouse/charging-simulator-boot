@@ -11,5 +11,5 @@ import lombok.Data;
 @Data
 public class RemoveGunRequest {
     
-    private Long sessionId;
+    private Long gunId;
 }

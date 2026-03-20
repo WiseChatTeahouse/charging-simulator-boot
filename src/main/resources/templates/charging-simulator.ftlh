@@ -619,7 +619,7 @@
             fetch('/api/charging/start', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: sessionId })
+                body: JSON.stringify({ gunId: gunId })
             })
             .then(response => response.json())
             .then(result => {
@@ -643,7 +643,7 @@
             fetch('/api/charging/stop', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: sessionId })
+                body: JSON.stringify({ gunId: gunId })
             })
             .then(response => response.json())
             .then(result => {
@@ -667,7 +667,7 @@
             fetch('/api/charging/remove-gun', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: sessionId })
+                body: JSON.stringify({ gunId: gunId })
             })
             .then(response => response.json())
             .then(result => {

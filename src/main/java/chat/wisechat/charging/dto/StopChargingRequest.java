@@ -11,5 +11,5 @@ import lombok.Data;
 @Data
 public class StopChargingRequest {
     
-    private Long sessionId;
+    private Long gunId;
 }

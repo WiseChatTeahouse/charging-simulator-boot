@@ -57,8 +57,7 @@ public class ChargingController {
     public Result<ChargingResultVO> stopCharging(@RequestBody StopChargingRequest request) {
         log.info("结束充电请求: {}", request);
 
-        // 兼容旧接口：如果传入sessionId，则当作gunId处理
-        Long gunId = request.getSessionId();
+        Long gunId = request.getGunId();
         if (gunId == null || gunId <= 0) {
             return Result.error("充电枪ID无效");
         }
@@ -74,8 +73,7 @@ public class ChargingController {
     public Result<Void> removeGun(@RequestBody RemoveGunRequest request) {
         log.info("拔枪请求: {}", request);
 
-        // 兼容旧接口：如果传入sessionId，则当作gunId处理
-        Long gunId = request.getSessionId();
+        Long gunId = request.getGunId();
         if (gunId == null || gunId <= 0) {
             return Result.error("充电枪ID无效");
         }

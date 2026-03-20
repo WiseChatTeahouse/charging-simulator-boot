@@ -111,10 +111,8 @@ public class ChargingService {
         }
 
         // 写入 Caffeine 本地缓存
-        gun.setStatus(2);
-        gun.setVersion(gun.getVersion() + 1);
         chargingDataCache.put(gunId, new ChargingDataVO());
-
+        // TODO: 后续使用TaskScheduledManager来执行充电报文下发mqtt的操作，所以缓存中需要记录任务ID等信息
         log.info("充电启动成功: gunId={}", gunId);
     }
 
