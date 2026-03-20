@@ -1,21 +1,27 @@
 package chat.wisechat.charging.service;
 
+import chat.wisechat.charging.core.TaskScheduledManager;
 import chat.wisechat.charging.entity.ChargingGun;
 import chat.wisechat.charging.exception.BusinessException;
 import chat.wisechat.charging.mapper.ChargingGunMapper;
-import chat.wisechat.charging.vo.ChargingDataVO;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -37,11 +43,24 @@ public class ChargingService {
     @Autowired
     private StationService stationService;
 
-    @Autowired
-    private Cache<Long, ChargingDataVO> chargingDataCache;
+    @Resource
+    private TaskScheduledManager taskScheduledManager;
+
+    @Resource
+    private ThreadPoolTaskScheduler chargingTaskScheduler;
+
+    private Cache<String, Object> chargingLocalCache;
 
     // 本地锁保证操作的原子性 - 每个充电枪一个锁
-    private final ConcurrentHashMap<Long, ReentrantLock> gunLocks = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, ReentrantLock> gunLocks = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    public void init() {
+        chargingLocalCache = Caffeine.newBuilder()
+                .maximumSize(50)
+                .expireAfterWrite(2, TimeUnit.HOURS)
+                .build();
+    }
 
     /**
      * 获取充电枪锁
@@ -107,10 +126,14 @@ public class ChargingService {
             throw new BusinessException("启动充电失败，充电枪状态已变更，请重试");
         }
 
+        ScheduledFuture<?> future = chargingTaskScheduler.scheduleAtFixedRate(() -> {
+            log.info("开始调度同步充电桩报文信息");
+        }, Duration.ofSeconds(5));
+
         // 写入 Caffeine 本地缓存
-        chargingDataCache.put(gunId, new ChargingDataVO());
-        // TODO: 后续使用TaskScheduledManager来执行充电报文下发mqtt的操作，所以缓存中需要记录任务ID等信息
-        log.info("充电启动成功: gunId={}", gunId);
+        String taskId = taskScheduledManager.registerTask(future, String.valueOf(gunId));
+        chargingLocalCache.put(String.valueOf(gunId), taskId);
+        log.info("充电启动成功: gunId={} taskId={}", gunId, taskId);
     }
 
     /**
@@ -141,6 +164,8 @@ public class ChargingService {
             throw new BusinessException("结束充电失败，充电枪状态已变更，请重试");
         }
 
+        Object taskId = chargingLocalCache.getIfPresent(String.valueOf(gunId));
+        taskScheduledManager.stopTask(taskId.toString());
         log.info("充电结束成功: gunId={}", gunId);
     }
 
@@ -171,6 +196,8 @@ public class ChargingService {
             throw new BusinessException("拔枪失败，充电枪状态已变更，请重试");
         }
 
+        Object taskId = chargingLocalCache.getIfPresent(String.valueOf(gunId));
+        taskScheduledManager.stopTask(taskId.toString());
         log.info("拔枪成功: gunId={}", gunId);
     }
 

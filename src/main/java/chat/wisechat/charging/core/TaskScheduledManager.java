@@ -1,5 +1,6 @@
 package chat.wisechat.charging.core;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
@@ -10,6 +11,7 @@ import java.util.concurrent.ScheduledFuture;
 /**
  * 任务执行管理器
  */
+@Slf4j
 @Component
 public class TaskScheduledManager {
 
@@ -32,6 +34,7 @@ public class TaskScheduledManager {
         ScheduledTaskInfo taskInfo = taskMap.remove(taskId);
         if (taskInfo != null) {
             taskInfo.future().cancel(false);
+            log.info("任务结束成功 taskId={}", taskId);
             return true;
         }
         return false;
