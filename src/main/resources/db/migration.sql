@@ -48,3 +48,7 @@ SET g.vehicle_id = s.vehicle_id,
 -- RENAME TABLE t_charging_session TO t_charging_session_deprecated;
 
 -- 注意：实际执行时请根据具体情况调整，建议先在测试环境验证
+
+-- 为t_charging_gun表添加乐观锁version字段
+ALTER TABLE t_charging_gun
+ADD COLUMN version INT DEFAULT 0 COMMENT '乐观锁版本号' AFTER total_power;

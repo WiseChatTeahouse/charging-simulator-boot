@@ -31,18 +31,7 @@ public class ChargingController {
      */
     @PostMapping("/insert-gun")
     public Result<Long> insertGun(@RequestBody InsertGunRequest request) {
-        log.info("插枪请求: {}", request);
-        
-        if (request.getGunId() == null || request.getGunId() <= 0) {
-            return Result.error("充电枪ID无效");
-        }
-        
-        if (request.getVehicleId() == null || request.getVehicleId().trim().isEmpty()) {
-            return Result.error("车辆ID不能为空");
-        }
-        
-        Long gunId = chargingService.insertGun(request.getGunId(), request.getVehicleId());
-        return Result.success(gunId);
+        return Result.success(chargingService.insertGun(request.getGunId(), request.getVehicleId()));
     }
     
     /**

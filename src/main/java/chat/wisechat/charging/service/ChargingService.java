@@ -5,6 +5,7 @@ import chat.wisechat.charging.exception.BusinessException;
 import chat.wisechat.charging.mapper.ChargingGunMapper;
 import chat.wisechat.charging.vo.ChargingResultVO;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -48,45 +49,35 @@ public class ChargingService {
     }
     
     /**
-     * 插枪操作
+     * 插枪操作 - 使用乐观锁保证并发安全，只更新枪状态和车辆ID
      */
     @Transactional(rollbackFor = Exception.class)
     public Long insertGun(Long gunId, String vehicleId) {
         log.info("插枪操作: gunId={}, vehicleId={}", gunId, vehicleId);
-        
-        ReentrantLock lock = getGunLock(gunId);
-        lock.lock();
-        try {
-            // 校验充电枪
-            ChargingGun gun = gunMapper.selectById(gunId);
-            if (gun == null) {
-                throw new BusinessException("充电枪不存在");
-            }
-            
-            if (gun.getStatus() != 0) {
-                throw new BusinessException("充电枪状态异常，无法插枪。当前状态: " + getGunStatusText(gun.getStatus()));
-            }
-            
-            // 更新充电枪状态为已插枪
-            gun.setStatus(1); // 已插枪
-            gun.setVehicleId(vehicleId);
-            gun.setStartTime(null);
-            gun.setEndTime(null);
-            gun.setTotalPower(null);
-            gunMapper.updateById(gun);
-            
-            // 清除充电桩详情缓存
-            stationService.clearPileDetailCache(gun.getPileId());
-            
-            // 缓存充电枪状态
-            String cacheKey = "gun:status:" + gunId;
-            redisTemplate.opsForValue().set(cacheKey, gun, 30, TimeUnit.MINUTES);
-            
-            log.info("插枪成功，gunId: {}", gunId);
-            return gunId;
-        } finally {
-            lock.unlock();
+
+        ChargingGun gun = gunMapper.selectById(gunId);
+        if (gun == null) {
+            throw new BusinessException("充电枪不存在");
         }
+
+        if (gun.getStatus() != 0) {
+            throw new BusinessException("充电枪状态异常，无法插枪。当前状态: " + getGunStatusText(gun.getStatus()));
+        }
+
+        // 乐观锁条件更新：只修改 status 和 vehicle_id，version 由 @Version 自动处理
+        LambdaUpdateWrapper<ChargingGun> wrapper = new LambdaUpdateWrapper<ChargingGun>()
+                .eq(ChargingGun::getId, gunId)
+                .eq(ChargingGun::getStatus, 0)
+                .eq(ChargingGun::getVersion, gun.getVersion())
+                .set(ChargingGun::getStatus, 1)
+                .set(ChargingGun::getVehicleId, vehicleId)
+                .set(ChargingGun::getVersion, gun.getVersion() + 1);
+
+        int rows = gunMapper.update(null, wrapper);
+        if (rows == 0) {
+            throw new BusinessException("插枪失败，充电枪状态已变更，请重试");
+        }
+        return gunId;
     }
     
     /**

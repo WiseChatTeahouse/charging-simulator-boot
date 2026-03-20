@@ -3,6 +3,7 @@ package chat.wisechat.charging.entity;
 import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.Version;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -51,7 +52,13 @@ public class ChargingGun {
      * 总电量(kWh)
      */
     private BigDecimal totalPower;
-    
+
+    /**
+     * 乐观锁版本号
+     */
+    @Version
+    private Integer version;
+
     private LocalDateTime createTime;
     
     private LocalDateTime updateTime;
