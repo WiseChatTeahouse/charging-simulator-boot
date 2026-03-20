@@ -652,7 +652,6 @@
                     isCharging = false;
                     updateButtonsByGunStatus(1);
                     document.getElementById('gun-status').textContent = '已插枪';
-                    if (ws) { ws.close(); ws = null; }
                 } else {
                     showStatus('结束充电失败: ' + result.message, true);
                 }
