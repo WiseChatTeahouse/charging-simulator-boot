@@ -48,6 +48,12 @@
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
             <version>3.5.16</version>
         </dependency>
+        <!-- Source: https://mvnrepository.com/artifact/com.baomidou/mybatis-plus-jsqlparser -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-jsqlparser</artifactId>
+            <version>3.5.16</version>
+        </dependency>
         <!-- https://mvnrepository.com/artifact/org.eclipse.paho/org.eclipse.paho.client.mqttv3 -->
         <dependency>
             <groupId>org.eclipse.paho</groupId>
