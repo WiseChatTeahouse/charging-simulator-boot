@@ -2,6 +2,7 @@ package chat.wisechat.charging.service;
 
 import chat.wisechat.charging.core.TaskScheduledManager;
 import chat.wisechat.charging.entity.ChargingGun;
+import chat.wisechat.charging.entity.EmulatorMessage;
 import chat.wisechat.charging.exception.BusinessException;
 import chat.wisechat.charging.mapper.ChargingGunMapper;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
@@ -19,8 +20,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -42,6 +45,9 @@ public class ChargingService {
 
     @Autowired
     private StationService stationService;
+
+    @Resource
+    private EmulatorMessageService emulatorMessageService;
 
     @Resource
     private TaskScheduledManager taskScheduledManager;
@@ -126,8 +132,26 @@ public class ChargingService {
             throw new BusinessException("启动充电失败，充电枪状态已变更，请重试");
         }
 
+        List<Long> groupIds = emulatorMessageService.getAllGroupIds();
+        Long randomGroupId;
+        if (!groupIds.isEmpty()) {
+            randomGroupId = groupIds.get(ThreadLocalRandom.current().nextInt(groupIds.size()));
+            List<EmulatorMessage> emulatorMessages = emulatorMessageService.getByGroupId(randomGroupId);
+            chargingLocalCache.put(String.valueOf(randomGroupId), emulatorMessages);
+        } else {
+            randomGroupId = null;
+        }
+
         ScheduledFuture<?> future = chargingTaskScheduler.scheduleAtFixedRate(() -> {
             log.info("开始调度同步充电桩报文信息");
+            Object cached = chargingLocalCache.getIfPresent(String.valueOf(randomGroupId));
+            if (cached instanceof List<?>) {
+                List<EmulatorMessage> messages = (List<EmulatorMessage>) cached;
+                // 3. 使用数据
+                EmulatorMessage emulatorMessage = messages.remove(0);
+                log.info("报文：{}", emulatorMessage);
+            }
+
         }, Duration.ofSeconds(5));
 
         // 写入 Caffeine 本地缓存
