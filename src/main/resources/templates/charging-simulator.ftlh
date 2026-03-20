@@ -674,6 +674,7 @@
                     showStatus('拔枪成功！');
                     isCharging = false;
                     sessionId = null;
+                    if (ws) { ws.close(); ws = null; }
                     updateButtonsByGunStatus(0);
                     document.getElementById('gun-status').textContent = '空闲';
                     document.getElementById('vehicle-panel').classList.add('grayed-out');

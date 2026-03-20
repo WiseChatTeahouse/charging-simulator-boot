@@ -145,47 +145,33 @@ public class ChargingService {
     }
 
     /**
-     * 拔枪操作
+     * 拔枪 - 乐观锁更新枪状态为空闲(0)
      */
     @Transactional(rollbackFor = Exception.class)
     public void removeGun(Long gunId) {
         log.info("拔枪操作: gunId={}", gunId);
 
-        ReentrantLock lock = getGunLock(gunId);
-        lock.lock();
-        try {
-            ChargingGun gun = gunMapper.selectById(gunId);
-            if (gun == null) {
-                throw new BusinessException("充电枪不存在");
-            }
-
-            if (gun.getStatus() == 2) {
-                throw new BusinessException("充电进行中，请先结束充电");
-            }
-
-            if (gun.getStatus() != 1) {
-                throw new BusinessException("充电枪状态异常，无法拔枪。当前状态: " + getGunStatusText(gun.getStatus()));
-            }
-
-            // 恢复充电枪状态为空闲
-            gun.setStatus(0); // 空闲
-            gun.setVehicleId(null);
-            gun.setStartTime(null);
-            gun.setEndTime(null);
-            gun.setTotalPower(null);
-            gunMapper.updateById(gun);
-
-            // 清除缓存
-            String cacheKey = "gun:status:" + gunId;
-            redisTemplate.delete(cacheKey);
-
-            // 清除充电桩详情缓存
-            stationService.clearPileDetailCache(gun.getPileId());
-
-            log.info("拔枪成功: gunId={}", gunId);
-        } finally {
-            lock.unlock();
+        ChargingGun gun = gunMapper.selectById(gunId);
+        if (gun == null) {
+            throw new BusinessException("充电枪不存在");
         }
+        if (gun.getStatus() != 1) {
+            throw new BusinessException("充电枪状态异常，无法拔枪。当前状态: " + getGunStatusText(gun.getStatus()));
+        }
+
+        LambdaUpdateWrapper<ChargingGun> wrapper = new LambdaUpdateWrapper<ChargingGun>()
+                .eq(ChargingGun::getId, gunId)
+                .eq(ChargingGun::getStatus, 1)
+                .eq(ChargingGun::getVersion, gun.getVersion())
+                .set(ChargingGun::getStatus, 0)
+                .set(ChargingGun::getVersion, gun.getVersion() + 1);
+
+        int rows = gunMapper.update(null, wrapper);
+        if (rows == 0) {
+            throw new BusinessException("拔枪失败，充电枪状态已变更，请重试");
+        }
+
+        log.info("拔枪成功: gunId={}", gunId);
     }
 
     /**
