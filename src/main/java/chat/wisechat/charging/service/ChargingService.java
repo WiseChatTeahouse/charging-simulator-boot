@@ -5,7 +5,6 @@ import chat.wisechat.charging.exception.BusinessException;
 import chat.wisechat.charging.mapper.ChargingGunMapper;
 import chat.wisechat.charging.vo.ChargingDataVO;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
-import chat.wisechat.charging.vo.ChargingResultVO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.github.benmanes.caffeine.cache.Cache;
 import lombok.extern.slf4j.Slf4j;
@@ -14,11 +13,9 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -117,65 +114,34 @@ public class ChargingService {
     }
 
     /**
-     * 结束充电
+     * 结束充电 - 乐观锁更新枪状态为已插枪(1)
      */
     @Transactional(rollbackFor = Exception.class)
-    public ChargingResultVO stopCharging(Long gunId) {
+    public void stopCharging(Long gunId) {
         log.info("结束充电: gunId={}", gunId);
 
-        ReentrantLock lock = getGunLock(gunId);
-        lock.lock();
-        try {
-            ChargingGun gun = gunMapper.selectById(gunId);
-            if (gun == null) {
-                throw new BusinessException("充电枪不存在");
-            }
-
-            if (gun.getStatus() != 2) {
-                throw new BusinessException("充电枪状态异常，无法结束充电。当前状态: " + getGunStatusText(gun.getStatus()));
-            }
-
-            // 更新充电枪状态为已插枪（结束充电但未拔枪）
-            gun.setStatus(1); // 已插枪
-            gun.setEndTime(LocalDateTime.now());
-
-            // 计算总电量（模拟值）
-            if (gun.getStartTime() != null) {
-                Duration duration = Duration.between(gun.getStartTime(), gun.getEndTime());
-                long minutes = duration.toMinutes();
-                // 假设平均功率 50kW
-                BigDecimal totalPower = BigDecimal.valueOf(minutes * 50.0 / 60.0);
-                gun.setTotalPower(totalPower);
-            } else {
-                gun.setTotalPower(BigDecimal.ZERO);
-            }
-
-            gunMapper.updateById(gun);
-
-            // 清除 Caffeine 缓存
-            chargingDataCache.invalidate(gunId);
-
-            // 更新缓存
-            String cacheKey = "gun:status:" + gunId;
-            redisTemplate.opsForValue().set(cacheKey, gun, 30, TimeUnit.MINUTES);
-
-            // 清除充电桩详情缓存
-            stationService.clearPileDetailCache(gun.getPileId());
-
-            // 构建返回结果
-            ChargingResultVO result = new ChargingResultVO();
-            result.setSessionId(gunId); // 使用gunId作为sessionId
-            result.setTotalPower(gun.getTotalPower());
-            if (gun.getStartTime() != null && gun.getEndTime() != null) {
-                result.setChargingDuration(Duration.between(gun.getStartTime(), gun.getEndTime()).toMinutes());
-            }
-            result.setMessage("充电结束");
-
-            log.info("充电结束成功，gunId: {}, 总电量: {} kWh", gunId, gun.getTotalPower());
-            return result;
-        } finally {
-            lock.unlock();
+        ChargingGun gun = gunMapper.selectById(gunId);
+        if (gun == null) {
+            throw new BusinessException("充电枪不存在");
         }
+        if (gun.getStatus() != 2) {
+            throw new BusinessException("充电枪状态异常，无法结束充电。当前状态: " + getGunStatusText(gun.getStatus()));
+        }
+
+        LambdaUpdateWrapper<ChargingGun> wrapper = new LambdaUpdateWrapper<ChargingGun>()
+                .eq(ChargingGun::getId, gunId)
+                .eq(ChargingGun::getStatus, 2)
+                .eq(ChargingGun::getVersion, gun.getVersion())
+                .set(ChargingGun::getStatus, 1)
+                .set(ChargingGun::getEndTime, LocalDateTime.now())
+                .set(ChargingGun::getVersion, gun.getVersion() + 1);
+
+        int rows = gunMapper.update(null, wrapper);
+        if (rows == 0) {
+            throw new BusinessException("结束充电失败，充电枪状态已变更，请重试");
+        }
+
+        log.info("充电结束成功: gunId={}", gunId);
     }
 
     /**

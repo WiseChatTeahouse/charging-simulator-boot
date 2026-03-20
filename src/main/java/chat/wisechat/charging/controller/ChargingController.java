@@ -7,7 +7,6 @@ import chat.wisechat.charging.dto.StartChargingRequest;
 import chat.wisechat.charging.dto.StopChargingRequest;
 import chat.wisechat.charging.service.ChargingService;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
-import chat.wisechat.charging.vo.ChargingResultVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -54,7 +53,7 @@ public class ChargingController {
      * 结束充电
      */
     @PostMapping("/stop")
-    public Result<ChargingResultVO> stopCharging(@RequestBody StopChargingRequest request) {
+    public Result<Void> stopCharging(@RequestBody StopChargingRequest request) {
         log.info("结束充电请求: {}", request);
 
         Long gunId = request.getGunId();
@@ -62,8 +61,8 @@ public class ChargingController {
             return Result.error("充电枪ID无效");
         }
 
-        ChargingResultVO result = chargingService.stopCharging(gunId);
-        return Result.success(result);
+        chargingService.stopCharging(gunId);
+        return Result.success();
     }
 
     /**
