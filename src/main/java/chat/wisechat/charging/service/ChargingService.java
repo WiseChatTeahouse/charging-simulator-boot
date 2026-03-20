@@ -53,7 +53,6 @@ public class ChargingService {
      */
     @Transactional(rollbackFor = Exception.class)
     public Long insertGun(Long gunId, String vehicleId) {
-        log.info("插枪操作: gunId={}, vehicleId={}", gunId, vehicleId);
 
         ChargingGun gun = gunMapper.selectById(gunId);
         if (gun == null) {
@@ -64,13 +63,12 @@ public class ChargingService {
             throw new BusinessException("充电枪状态异常，无法插枪。当前状态: " + getGunStatusText(gun.getStatus()));
         }
 
-        // 乐观锁条件更新：只修改 status 和 vehicle_id，version 由 @Version 自动处理
+        // 乐观锁条件更新：只修改 status，version 由 @Version 自动处理
         LambdaUpdateWrapper<ChargingGun> wrapper = new LambdaUpdateWrapper<ChargingGun>()
                 .eq(ChargingGun::getId, gunId)
                 .eq(ChargingGun::getStatus, 0)
                 .eq(ChargingGun::getVersion, gun.getVersion())
                 .set(ChargingGun::getStatus, 1)
-                .set(ChargingGun::getVehicleId, vehicleId)
                 .set(ChargingGun::getVersion, gun.getVersion() + 1);
 
         int rows = gunMapper.update(null, wrapper);
