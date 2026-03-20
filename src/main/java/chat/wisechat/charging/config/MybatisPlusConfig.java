@@ -10,6 +10,6 @@ import org.springframework.context.annotation.Configuration;
  * @date 2026/3/3
  */
 @Configuration
-@MapperScan("chat.wisechat.charging.mapper")
+@MapperScan("chat.wisechat.**.mapper")
 public class MybatisPlusConfig {
 }
