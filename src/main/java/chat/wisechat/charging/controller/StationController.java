@@ -2,7 +2,6 @@ package chat.wisechat.charging.controller;
 
 import chat.wisechat.charging.common.Result;
 import chat.wisechat.charging.service.StationService;
-import chat.wisechat.charging.vo.ChargingPileDetailVO;
 import chat.wisechat.charging.vo.StationDetailVO;
 import chat.wisechat.charging.vo.StationVO;
 import lombok.extern.slf4j.Slf4j;
@@ -24,30 +23,23 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/stations")
 public class StationController {
-    
+
     @Autowired
     private StationService stationService;
-    
+
     /**
      * 获取站点列表
      */
     @GetMapping
     public Result<List<StationVO>> listStations() {
-        log.info("查询站点列表");
-        List<StationVO> stations = stationService.listStations();
-        return Result.success(stations);
+        return Result.success(stationService.listStations());
     }
-    
+
     /**
      * 获取站点详情
      */
     @GetMapping("/{stationId}")
     public Result<StationDetailVO> getStationDetail(@PathVariable Long stationId) {
-        log.info("查询站点详情: {}", stationId);
-        if (stationId == null || stationId <= 0) {
-            return Result.error("站点ID无效");
-        }
-        StationDetailVO detail = stationService.getStationDetail(stationId);
-        return Result.success(detail);
+        return Result.success(stationService.getStationDetail(stationId));
     }
 }
