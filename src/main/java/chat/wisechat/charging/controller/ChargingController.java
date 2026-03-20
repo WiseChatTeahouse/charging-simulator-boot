@@ -41,8 +41,7 @@ public class ChargingController {
     public Result<Void> startCharging(@RequestBody StartChargingRequest request) {
         log.info("启动充电请求: {}", request);
 
-        // 兼容旧接口：如果传入sessionId，则当作gunId处理
-        Long gunId = request.getSessionId();
+        Long gunId = request.getGunId();
         if (gunId == null || gunId <= 0) {
             return Result.error("充电枪ID无效");
         }

@@ -11,5 +11,5 @@ import lombok.Data;
 @Data
 public class StartChargingRequest {
     
-    private Long sessionId;
+    private Long gunId;
 }

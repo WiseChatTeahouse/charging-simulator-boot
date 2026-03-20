@@ -5,7 +5,6 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.util.concurrent.TimeUnit;
 
@@ -27,17 +26,5 @@ public class CaffeineConfig {
                 .maximumSize(1000)
                 .expireAfterWrite(1, TimeUnit.HOURS)
                 .build();
-    }
-
-    /**
-     * 充电推送任务调度器
-     */
-    @Bean
-    public ThreadPoolTaskScheduler taskScheduler() {
-        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setPoolSize(10);
-        scheduler.setThreadNamePrefix("charging-push-");
-        scheduler.initialize();
-        return scheduler;
     }
 }
