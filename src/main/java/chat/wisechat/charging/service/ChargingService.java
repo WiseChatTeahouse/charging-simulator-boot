@@ -3,19 +3,27 @@ package chat.wisechat.charging.service;
 import chat.wisechat.charging.entity.ChargingGun;
 import chat.wisechat.charging.exception.BusinessException;
 import chat.wisechat.charging.mapper.ChargingGunMapper;
+import chat.wisechat.charging.vo.ChargingDataVO;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
 import chat.wisechat.charging.vo.ChargingResultVO;
+import chat.wisechat.charging.vo.VehicleBmsDataVO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.github.benmanes.caffeine.cache.Cache;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Map;
+import java.util.Random;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
@@ -37,6 +45,20 @@ public class ChargingService {
 
     @Autowired
     private StationService stationService;
+
+    @Autowired
+    private WebSocketService webSocketService;
+
+    @Autowired
+    private Cache<Long, ChargingDataVO> chargingDataCache;
+
+    @Autowired
+    private ThreadPoolTaskScheduler taskScheduler;
+
+    // gunId -> 推送任务
+    private final Map<Long, ScheduledFuture<?>> chargingTasks = new ConcurrentHashMap<>();
+
+    private final Random random = new Random();
 
     // 本地锁保证操作的原子性 - 每个充电枪一个锁
     private final ConcurrentHashMap<Long, ReentrantLock> gunLocks = new ConcurrentHashMap<>();
@@ -78,7 +100,7 @@ public class ChargingService {
     }
 
     /**
-     * 启动充电
+     * 启动充电 - 更新枪状态为充电中(2)，写入本地缓存，启动 WebSocket 推送任务
      */
     @Transactional(rollbackFor = Exception.class)
     public void startCharging(Long gunId) {
@@ -96,24 +118,92 @@ public class ChargingService {
                 throw new BusinessException("充电枪状态异常，无法启动充电。当前状态: " + getGunStatusText(gun.getStatus()));
             }
 
-            // 更新充电枪状态为充电中
-            gun.setStatus(2); // 充电中
+            // 更新枪状态为充电中(2)
+            gun.setStatus(2);
             gun.setStartTime(LocalDateTime.now());
             gun.setEndTime(null);
             gun.setTotalPower(null);
             gunMapper.updateById(gun);
 
-            // 更新缓存
+            // 写入 Caffeine 本地缓存
+            ChargingDataVO initialData = buildChargingData(gunId, 20);
+            chargingDataCache.put(gunId, initialData);
+
+            // 更新 Redis 缓存
             String cacheKey = "gun:status:" + gunId;
             redisTemplate.opsForValue().set(cacheKey, gun, 30, TimeUnit.MINUTES);
 
             // 清除充电桩详情缓存
             stationService.clearPileDetailCache(gun.getPileId());
 
+            // 启动定时推送任务（每2秒推送一次充电数据和BMS数据）
+            startChargingPushTask(gunId);
+
             log.info("充电启动成功: gunId={}", gunId);
         } finally {
             lock.unlock();
         }
+    }
+
+    /**
+     * 启动充电数据推送定时任务
+     */
+    private void startChargingPushTask(Long gunId) {
+        stopChargingPushTask(gunId);
+        ScheduledFuture<?> future = taskScheduler.scheduleAtFixedRate(() -> {
+            try {
+                ChargingDataVO chargingData = buildChargingData(gunId, null);
+                chargingDataCache.put(gunId, chargingData);
+                webSocketService.pushChargingData(gunId, chargingData);
+                webSocketService.pushBmsData(gunId, buildBmsData(gunId));
+            } catch (Exception e) {
+                log.error("推送充电数据失败: gunId={}", gunId, e);
+            }
+        }, Duration.ofSeconds(2));
+        chargingTasks.put(gunId, future);
+        log.info("充电推送任务已启动: gunId={}", gunId);
+    }
+
+    /**
+     * 停止充电数据推送定时任务
+     */
+    private void stopChargingPushTask(Long gunId) {
+        ScheduledFuture<?> future = chargingTasks.remove(gunId);
+        if (future != null) {
+            future.cancel(false);
+            log.info("充电推送任务已停止: gunId={}", gunId);
+        }
+    }
+
+    /**
+     * 构建模拟充电数据，soc 每次递增
+     */
+    private ChargingDataVO buildChargingData(Long gunId, Integer fixedSoc) {
+        ChargingDataVO existing = chargingDataCache.getIfPresent(gunId);
+        int soc = fixedSoc != null ? fixedSoc
+                : (existing != null ? Math.min(existing.getSoc() + random.nextInt(2), 100) : 20);
+        ChargingDataVO data = new ChargingDataVO();
+        data.setVoltage(BigDecimal.valueOf(380 + random.nextInt(20)).setScale(1, RoundingMode.HALF_UP));
+        data.setCurrent(BigDecimal.valueOf(50 + random.nextInt(30)).setScale(1, RoundingMode.HALF_UP));
+        data.setPower(data.getVoltage().multiply(data.getCurrent())
+                .divide(BigDecimal.valueOf(1000), 2, RoundingMode.HALF_UP));
+        data.setSoc(soc);
+        data.setTimestamp(LocalDateTime.now());
+        return data;
+    }
+
+    /**
+     * 构建模拟 BMS 数据
+     */
+    private VehicleBmsDataVO buildBmsData(Long gunId) {
+        ChargingDataVO charging = chargingDataCache.getIfPresent(gunId);
+        VehicleBmsDataVO data = new VehicleBmsDataVO();
+        data.setBatteryVoltage(BigDecimal.valueOf(350 + random.nextInt(30)).setScale(1, RoundingMode.HALF_UP));
+        data.setBatteryCurrent(BigDecimal.valueOf(40 + random.nextInt(20)).setScale(1, RoundingMode.HALF_UP));
+        data.setBatteryTemp(BigDecimal.valueOf(25 + random.nextInt(15)).setScale(1, RoundingMode.HALF_UP));
+        data.setSoc(charging != null ? charging.getSoc() : 20);
+        data.setTimestamp(LocalDateTime.now());
+        return data;
     }
 
     /**
@@ -151,6 +241,10 @@ public class ChargingService {
             }
 
             gunMapper.updateById(gun);
+
+            // 停止推送任务，清除 Caffeine 缓存
+            stopChargingPushTask(gunId);
+            chargingDataCache.invalidate(gunId);
 
             // 更新缓存
             String cacheKey = "gun:status:" + gunId;
