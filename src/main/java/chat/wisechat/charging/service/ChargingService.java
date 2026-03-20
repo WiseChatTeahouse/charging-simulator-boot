@@ -157,7 +157,7 @@ public class ChargingService {
                     log.info("gunId={} 报文已全部消费，任务继续等待", gunId);
                     return;
                 }
-                EmulatorMessage message = cached.remove(cached.size() - 1);
+                EmulatorMessage message = cached.removeLast();
                 log.info("gunId={} 消费报文: {}", gunId, message);
             } catch (Exception e) {
                 log.error("gunId={} 报文调度异常", gunId, e);
