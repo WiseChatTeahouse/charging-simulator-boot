@@ -105,7 +105,7 @@ public class ChargingService {
     }
 
     /**
-     * 启动充电 - 乐观锁更新枪状态为充电中(2)，写入 Caffeine 本地缓存
+     * 启动充电 - 乐观锁更新枪状态为充电中(2)，写入 Caffeine 本地缓存并启动调度任务
      */
     @Transactional(rollbackFor = Exception.class)
     public void startCharging(Long gunId) {
@@ -132,29 +132,38 @@ public class ChargingService {
             throw new BusinessException("启动充电失败，充电枪状态已变更，请重试");
         }
 
+        // 随机选取一组报文并写入本地缓存
         List<Long> groupIds = emulatorMessageService.getAllGroupIds();
-        Long randomGroupId;
-        if (!groupIds.isEmpty()) {
-            randomGroupId = groupIds.get(ThreadLocalRandom.current().nextInt(groupIds.size()));
-            List<EmulatorMessage> emulatorMessages = emulatorMessageService.getByGroupId(randomGroupId);
-            chargingLocalCache.put(String.valueOf(randomGroupId), emulatorMessages);
-        } else {
-            randomGroupId = null;
+        if (groupIds.isEmpty()) {
+            log.warn("无可用报文分组，gunId={} 将跳过报文调度", gunId);
+            return;
         }
 
-        ScheduledFuture<?> future = chargingTaskScheduler.scheduleAtFixedRate(() -> {
-            log.info("开始调度同步充电桩报文信息");
-            Object cached = chargingLocalCache.getIfPresent(String.valueOf(randomGroupId));
-            if (cached instanceof List<?>) {
-                List<EmulatorMessage> messages = (List<EmulatorMessage>) cached;
-                // 3. 使用数据
-                EmulatorMessage emulatorMessage = messages.remove(0);
-                log.info("报文：{}", emulatorMessage);
-            }
+        Long randomGroupId = groupIds.get(ThreadLocalRandom.current().nextInt(groupIds.size()));
+        List<EmulatorMessage> messages = emulatorMessageService.getByGroupId(randomGroupId);
+        if (messages == null || messages.isEmpty()) {
+            log.warn("分组 {} 下无报文数据，gunId={} 将跳过报文调度", randomGroupId, gunId);
+            return;
+        }
+        chargingLocalCache.put(String.valueOf(randomGroupId), messages);
 
+        // 启动调度任务，每5秒消费一条报文
+        ScheduledFuture<?> future = chargingTaskScheduler.scheduleAtFixedRate(() -> {
+            try {
+                @SuppressWarnings("unchecked")
+                List<EmulatorMessage> cached = (List<EmulatorMessage>)
+                        chargingLocalCache.getIfPresent(String.valueOf(randomGroupId));
+                if (cached == null || cached.isEmpty()) {
+                    log.info("gunId={} 报文已全部消费，任务继续等待", gunId);
+                    return;
+                }
+                EmulatorMessage message = cached.remove(0);
+                log.info("gunId={} 消费报文: {}", gunId, message);
+            } catch (Exception e) {
+                log.error("gunId={} 报文调度异常", gunId, e);
+            }
         }, Duration.ofSeconds(5));
 
-        // 写入 Caffeine 本地缓存
         String taskId = taskScheduledManager.registerTask(future, String.valueOf(gunId));
         chargingLocalCache.put(String.valueOf(gunId), taskId);
         log.info("充电启动成功: gunId={} taskId={}", gunId, taskId);
