@@ -129,6 +129,24 @@ public class MqttService {
     }
     
     /**
+     * 发布消息到指定 topic
+     */
+    public void publish(String topic, String payload) {
+        try {
+            if (mqttClient != null && mqttClient.isConnected()) {
+                MqttMessage message = new MqttMessage(payload.getBytes());
+                message.setQos(mqttConfig.getQos());
+                mqttClient.publish(topic, message);
+                log.debug("发布消息: topic={}", topic);
+            } else {
+                log.warn("MQTT 客户端未连接，无法发布消息: topic={}", topic);
+            }
+        } catch (MqttException e) {
+            log.error("发布消息失败: topic={}", topic, e);
+        }
+    }
+
+    /**
      * 发布控制命令
      */
     public void publishControlCommand(Long gunId, String command) {

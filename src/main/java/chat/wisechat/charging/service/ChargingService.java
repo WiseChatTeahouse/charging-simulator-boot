@@ -1,15 +1,15 @@
 package chat.wisechat.charging.service;
 
+import chat.wisechat.charging.core.ChargingCacheManager;
 import chat.wisechat.charging.core.TaskScheduledManager;
 import chat.wisechat.charging.entity.ChargingGun;
+import chat.wisechat.charging.entity.ChargingPile;
 import chat.wisechat.charging.entity.EmulatorMessage;
 import chat.wisechat.charging.exception.BusinessException;
 import chat.wisechat.charging.mapper.ChargingGunMapper;
+import chat.wisechat.charging.mapper.ChargingPileMapper;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
-import jakarta.annotation.PostConstruct;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,14 +17,17 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -41,6 +44,9 @@ public class ChargingService {
     private ChargingGunMapper gunMapper;
 
     @Autowired
+    private ChargingPileMapper pileMapper;
+
+    @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     @Autowired
@@ -50,23 +56,19 @@ public class ChargingService {
     private EmulatorMessageService emulatorMessageService;
 
     @Resource
+    private MqttService mqttService;
+
+    @Resource
     private TaskScheduledManager taskScheduledManager;
 
     @Resource
     private ThreadPoolTaskScheduler chargingTaskScheduler;
 
-    private Cache<String, Object> chargingLocalCache;
+    @Autowired
+    private ChargingCacheManager chargingCacheManager;
 
     // 本地锁保证操作的原子性 - 每个充电枪一个锁
     private static final ConcurrentHashMap<Long, ReentrantLock> gunLocks = new ConcurrentHashMap<>();
-
-    @PostConstruct
-    public void init() {
-        chargingLocalCache = Caffeine.newBuilder()
-                .maximumSize(50)
-                .expireAfterWrite(2, TimeUnit.HOURS)
-                .build();
-    }
 
     /**
      * 获取充电枪锁
@@ -132,7 +134,20 @@ public class ChargingService {
             throw new BusinessException("启动充电失败，充电枪状态已变更，请重试");
         }
 
-        // 随机选取一组报文并写入本地缓存
+        // 注册事务提交后回调，确保 DB 提交后再启动定时任务
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                startChargingTask(gunId, gun);
+            }
+        });
+    }
+
+    /**
+     * 启动充电定时任务（在事务提交后调用）
+     */
+    private void startChargingTask(Long gunId, ChargingGun gun) {
+        // 随机选取一组报文，按 stepOrder 排序
         List<Long> groupIds = emulatorMessageService.getAllGroupIds();
         if (groupIds.isEmpty()) {
             log.warn("无可用报文分组，gunId={} 将跳过报文调度", gunId);
@@ -145,27 +160,40 @@ public class ChargingService {
             log.warn("分组 {} 下无报文数据，gunId={} 将跳过报文调度", randomGroupId, gunId);
             return;
         }
-        chargingLocalCache.put(String.valueOf(randomGroupId), messages);
+        messages.sort(Comparator.comparingInt(EmulatorMessage::getStepOrder));
 
-        // 启动调度任务，每5秒消费一条报文
+        // 查询充电桩和站点信息，构建 MQTT topic
+        ChargingPile pile = pileMapper.selectById(gun.getPileId());
+        if (pile == null) {
+            log.warn("充电桩不存在，gunId={} pileId={}", gunId, gun.getPileId());
+            return;
+        }
+        String mqttTopic = String.format("charging/station/%d/pile/%d/gun/%d/data",
+                pile.getStationId(), pile.getId(), gunId);
+
+        java.util.concurrent.atomic.AtomicInteger index = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        // 立即开始，每2秒执行一次
         ScheduledFuture<?> future = chargingTaskScheduler.scheduleAtFixedRate(() -> {
             try {
-                @SuppressWarnings("unchecked")
-                List<EmulatorMessage> cached = (List<EmulatorMessage>)
-                        chargingLocalCache.getIfPresent(String.valueOf(randomGroupId));
-                if (cached == null || cached.isEmpty()) {
-                    log.info("gunId={} 报文已全部消费，任务继续等待", gunId);
-                    return;
+                int i = index.getAndIncrement();
+                if (i >= messages.size()) {
+                    index.set(0);
+                    i = 0;
                 }
-                EmulatorMessage message = cached.removeLast();
-                log.info("gunId={} 消费报文: {}", gunId, message);
+                EmulatorMessage message = messages.get(i);
+                mqttService.publish(mqttTopic, message.getPayload());
+                log.info("gunId={} 发布报文 step={} topic={}", gunId, message.getStepOrder(), mqttTopic);
             } catch (Exception e) {
                 log.error("gunId={} 报文调度异常", gunId, e);
             }
-        }, Duration.ofSeconds(2));
+        }, Instant.now(), Duration.ofSeconds(2));
 
         String taskId = taskScheduledManager.registerTask(future, String.valueOf(gunId));
-        chargingLocalCache.put(String.valueOf(gunId), taskId);
+        chargingCacheManager.putTaskId(gunId, taskId);
+        if (gun.getVehicleId() != null) {
+            chargingCacheManager.putVehicleGun(gun.getVehicleId(), gunId);
+        }
         log.info("充电启动成功: gunId={} taskId={}", gunId, taskId);
     }
 
@@ -197,8 +225,16 @@ public class ChargingService {
             throw new BusinessException("结束充电失败，充电枪状态已变更，请重试");
         }
 
-        Object taskId = chargingLocalCache.getIfPresent(String.valueOf(gunId));
-        taskScheduledManager.stopTask(taskId.toString());
+        String taskId = chargingCacheManager.getTaskId(gunId);
+        if (taskId != null) {
+            taskScheduledManager.stopTask(taskId);
+            chargingCacheManager.removeTaskId(gunId);
+        } else {
+            log.warn("未找到 gunId={} 对应的定时任务，可能已停止", gunId);
+        }
+        if (gun.getVehicleId() != null) {
+            chargingCacheManager.removeVehicleGun(gun.getVehicleId());
+        }
         log.info("充电结束成功: gunId={}", gunId);
     }
 
@@ -229,8 +265,11 @@ public class ChargingService {
             throw new BusinessException("拔枪失败，充电枪状态已变更，请重试");
         }
 
-        Object taskId = chargingLocalCache.getIfPresent(String.valueOf(gunId));
-        taskScheduledManager.stopTask(taskId.toString());
+        String taskId = chargingCacheManager.getTaskId(gunId);
+        if (taskId != null) {
+            taskScheduledManager.stopTask(taskId);
+            chargingCacheManager.removeTaskId(gunId);
+        }
         log.info("拔枪成功: gunId={}", gunId);
     }
 
