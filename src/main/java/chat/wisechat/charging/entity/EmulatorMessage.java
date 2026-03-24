@@ -6,6 +6,8 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.util.Date;
+
 @Data
 @TableName("t_emulator_messages")
 public class EmulatorMessage {
@@ -16,6 +18,10 @@ public class EmulatorMessage {
     private Long groupId;
 
     private Integer stepOrder;
+
+    private String type;
+
+    private Date time;
 
     private String payload; // 对应数据库的 JSON 字段
 

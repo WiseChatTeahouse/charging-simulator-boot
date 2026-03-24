@@ -3,7 +3,6 @@ package chat.wisechat.charging.service.impl;
 import chat.wisechat.charging.entity.EmulatorMessage;
 import chat.wisechat.charging.mapper.EmulatorMessageMapper;
 import chat.wisechat.charging.service.EmulatorMessageService;
-import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -14,6 +13,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Objects;
 import java.util.stream.Collectors;
@@ -24,6 +25,9 @@ import java.util.stream.Collectors;
  */
 @Service
 public class EmulatorMessageServiceImpl extends ServiceImpl<EmulatorMessageMapper, EmulatorMessage> implements EmulatorMessageService {
+
+    private static final SimpleDateFormat SIMPLE_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd HH:mm:ss");
+
 
     @Override
     public void uploadMessage(MultipartFile file) {
@@ -43,10 +47,21 @@ public class EmulatorMessageServiceImpl extends ServiceImpl<EmulatorMessageMappe
         // 摘出需要的报文数据
         long groupId = System.currentTimeMillis();
         for (int i = 0; i < values.size(); i++) {
-            EmulatorMessage emulatorMessage = new EmulatorMessage();
-            emulatorMessage.setPayload(JSON.toJSONString(values.get(i)));
-            emulatorMessage.setGroupId(groupId);
-            emulatorMessage.setStepOrder(i + 1);
+            EmulatorMessage emulatorMessage = null;
+            try {
+                emulatorMessage = new EmulatorMessage();
+                JSONArray payload = JSONArray.from(values.get(i));
+                String type = JSONObject.from(payload.get(0)).getString("v");
+                String time = JSONObject.from(payload.get(1)).getString("v");
+                String payloadInfo = JSONObject.from(payload.get(3)).getString("v");
+                emulatorMessage.setType(type);
+                emulatorMessage.setTime(SIMPLE_DATE_FORMAT.parse(time));
+                emulatorMessage.setPayload(payloadInfo);
+                emulatorMessage.setGroupId(groupId);
+                emulatorMessage.setStepOrder(i + 1);
+            } catch (ParseException e) {
+                throw new RuntimeException(e);
+            }
             save(emulatorMessage);
         }
     }
