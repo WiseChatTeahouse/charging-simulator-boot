@@ -17,8 +17,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -28,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -109,7 +108,6 @@ public class ChargingService {
     /**
      * 启动充电 - 乐观锁更新枪状态为充电中(2)，写入 Caffeine 本地缓存并启动调度任务
      */
-    @Transactional(rollbackFor = Exception.class)
     public void startCharging(Long gunId) {
         log.info("启动充电: gunId={}", gunId);
 
@@ -134,13 +132,7 @@ public class ChargingService {
             throw new BusinessException("启动充电失败，充电枪状态已变更，请重试");
         }
 
-        // 注册事务提交后回调，确保 DB 提交后再启动定时任务
-        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-            @Override
-            public void afterCommit() {
-                startChargingTask(gunId, gun);
-            }
-        });
+        startChargingTask(gunId, gun);
     }
 
     /**
@@ -160,7 +152,7 @@ public class ChargingService {
             log.warn("分组 {} 下无报文数据，gunId={} 将跳过报文调度", randomGroupId, gunId);
             return;
         }
-        messages.sort(Comparator.comparingInt(EmulatorMessage::getStepOrder));
+        messages.sort(Comparator.comparingInt(EmulatorMessage::getStepOrder).reversed());// 降序（从大到小）
 
         // 查询充电桩和站点信息，构建 MQTT topic
         ChargingPile pile = pileMapper.selectById(gun.getPileId());
@@ -171,7 +163,7 @@ public class ChargingService {
         String mqttTopic = String.format("charging/station/%d/pile/%d/gun/%d/data",
                 pile.getStationId(), pile.getId(), gunId);
 
-        java.util.concurrent.atomic.AtomicInteger index = new java.util.concurrent.atomic.AtomicInteger(0);
+        AtomicInteger index = new AtomicInteger(0);
 
         // 立即开始，每2秒执行一次
         ScheduledFuture<?> future = chargingTaskScheduler.scheduleAtFixedRate(() -> {
