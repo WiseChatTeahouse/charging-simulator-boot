@@ -9,6 +9,7 @@ import chat.wisechat.charging.exception.BusinessException;
 import chat.wisechat.charging.mapper.ChargingGunMapper;
 import chat.wisechat.charging.mapper.ChargingPileMapper;
 import chat.wisechat.charging.vo.ChargingGunSessionVO;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
@@ -174,7 +175,7 @@ public class ChargingService {
                     i = 0;
                 }
                 EmulatorMessage message = messages.get(i);
-                mqttService.publish(mqttTopic, message.getPayload());
+                mqttService.publish(mqttTopic, JSON.toJSONString(message));
                 log.info("gunId={} 发布报文 step={} topic={}", gunId, message.getStepOrder(), mqttTopic);
             } catch (Exception e) {
                 log.error("gunId={} 报文调度异常", gunId, e);

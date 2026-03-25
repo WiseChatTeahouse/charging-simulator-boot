@@ -1,7 +1,7 @@
 package chat.wisechat.charging.service;
 
 import chat.wisechat.charging.core.ChargingCacheManager;
-import chat.wisechat.charging.vo.ChargingDataVO;
+import chat.wisechat.charging.entity.EmulatorMessage;
 import chat.wisechat.charging.vo.VehicleBmsDataVO;
 import com.alibaba.fastjson2.JSON;
 import lombok.extern.slf4j.Slf4j;
@@ -81,9 +81,9 @@ public class MqttMessageHandler implements MqttCallback {
                 return;
             }
 
-            ChargingDataVO data = JSON.parseObject(payload, ChargingDataVO.class);
-            webSocketService.pushChargingData(gunId, data);
-            log.debug("充电数据已推送: gunId={}", gunId);
+            EmulatorMessage msg = JSON.parseObject(payload, EmulatorMessage.class);
+            webSocketService.buildPushMsg(gunId, msg);
+            log.info("充电数据已推送: gunId={} payload={}", gunId, payload);
 
         } catch (Exception e) {
             log.error("处理充电数据失败: topic={}", topic, e);
