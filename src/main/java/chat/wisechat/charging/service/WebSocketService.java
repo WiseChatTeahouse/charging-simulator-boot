@@ -104,6 +104,13 @@ public class WebSocketService {
             ChargingDataVO chargingData = new ChargingDataVO();
             chargingData.setEnergy(raw.getBigDecimal("energy"));
             message.setData(chargingData);
+        } else if ("ycAnalog".equals(msg.getType())) {
+            com.alibaba.fastjson2.JSONObject raw = JSON.parseObject(msg.getPayload());
+            ChargingDataVO chargingData = new ChargingDataVO();
+            chargingData.setVoltage(raw.getBigDecimal("vol"));
+            chargingData.setCurrent(raw.getBigDecimal("cur"));
+            chargingData.setPower(raw.getBigDecimal("power"));
+            message.setData(chargingData);
         } else {
             message.setData(msg.getPayload());
         }
@@ -177,7 +184,8 @@ public class WebSocketService {
     private enum ChargingPayloadType {
         BMS("ycBMS", "BMS_DATA"),
         START_CHARGING("start", "CHARGING_DATA"),
-        MEAS("ycMeas", "CHARGING_DATA");
+        MEAS("ycMeas", "CHARGING_DATA"),
+        ANALOG("ycAnalog", "CHARGING_DATA");
 
 
         private final String payloadType;
