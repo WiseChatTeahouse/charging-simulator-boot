@@ -443,6 +443,10 @@
                     <span class="data-label">SOC</span>
                     <span><span class="data-value" id="soc">--</span><span class="data-unit">%</span></span>
                 </div>
+                <div class="data-item">
+                    <span class="data-label">充电电量</span>
+                    <span><span class="data-value" id="energy">--</span><span class="data-unit">kWh</span></span>
+                </div>
             </div>
         </div>
         
@@ -737,7 +741,7 @@
         function resetDataDisplay() {
             if (chargingDataTimer) { clearTimeout(chargingDataTimer); chargingDataTimer = null; }
             if (bmsDataTimer) { clearTimeout(bmsDataTimer); bmsDataTimer = null; }
-            ['voltage','current','power','soc','battery-soc','bms-m-vol','bms-m-cur','bms-r-vol','bms-r-cur',
+            ['voltage','current','power','soc','energy','battery-soc','bms-m-vol','bms-m-cur','bms-r-vol','bms-r-cur',
              'bms-max-temp','bms-min-temp','bms-remain-time'].forEach(id => {
                 document.getElementById(id).textContent = '--';
             });
@@ -772,8 +776,9 @@
             if (data.current != null) document.getElementById('current').textContent = data.current.toFixed(1);
             if (data.power != null) document.getElementById('power').textContent = data.power.toFixed(2);
             if (data.soc != null) document.getElementById('soc').textContent = data.soc;
+            if (data.energy != null) document.getElementById('energy').textContent = data.energy.toFixed(3);
             chargingDataTimer = setTimeout(() => {
-                ['voltage','current','power','soc'].forEach(id => document.getElementById(id).textContent = '--');
+                ['voltage','current','power','soc','energy'].forEach(id => document.getElementById(id).textContent = '--');
             }, DATA_TIMEOUT);
         }
         

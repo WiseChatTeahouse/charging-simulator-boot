@@ -21,6 +21,9 @@ public class ChargingDataVO {
     private BigDecimal power;
     
     private Integer soc;
+
+    /** 充电电量（度数），来自 ycMeas 报文的 energy 字段 */
+    private BigDecimal energy;
     
     private LocalDateTime timestamp;
 }

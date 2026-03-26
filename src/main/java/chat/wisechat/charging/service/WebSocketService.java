@@ -99,6 +99,11 @@ public class WebSocketService {
             bmsData.setCellMaxVol(raw.getDouble("cellMaxVol"));
             bmsData.setRemainTime(raw.getInteger("remainTime"));
             message.setData(bmsData);
+        } else if ("ycMeas".equals(msg.getType())) {
+            com.alibaba.fastjson2.JSONObject raw = JSON.parseObject(msg.getPayload());
+            ChargingDataVO chargingData = new ChargingDataVO();
+            chargingData.setEnergy(raw.getBigDecimal("energy"));
+            message.setData(chargingData);
         } else {
             message.setData(msg.getPayload());
         }
