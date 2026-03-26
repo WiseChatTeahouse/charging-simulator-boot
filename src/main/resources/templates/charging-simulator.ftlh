@@ -451,6 +451,22 @@
             <div id="bms-data" class="bms-container">
                 <div class="bms-left">
                     <div class="bms-data-item">
+                        <span class="bms-label">SOC</span>
+                        <span class="bms-value"><span id="battery-soc">--</span><span class="bms-unit">%</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">预估剩余时间</span>
+                        <span class="bms-value"><span id="bms-remain-time">--</span><span class="bms-unit">min</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">电池组最低温度</span>
+                        <span class="bms-value"><span id="bms-min-temp">--</span><span class="bms-unit">°C</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">电池组最高温度</span>
+                        <span class="bms-value"><span id="bms-max-temp">--</span><span class="bms-unit">°C</span></span>
+                    </div>
+                    <div class="bms-data-item">
                         <span class="bms-label">需求电压</span>
                         <span class="bms-value"><span id="bms-r-vol">--</span><span class="bms-unit">V</span></span>
                     </div>
@@ -459,28 +475,12 @@
                         <span class="bms-value"><span id="bms-r-cur">--</span><span class="bms-unit">A</span></span>
                     </div>
                     <div class="bms-data-item">
-                        <span class="bms-label">SOC</span>
-                        <span class="bms-value"><span id="battery-soc">--</span><span class="bms-unit">%</span></span>
-                    </div>
-                    <div class="bms-data-item">
                         <span class="bms-label">测量电压</span>
                         <span class="bms-value"><span id="bms-m-vol">--</span><span class="bms-unit">V</span></span>
                     </div>
                     <div class="bms-data-item">
                         <span class="bms-label">测量电流</span>
                         <span class="bms-value"><span id="bms-m-cur">--</span><span class="bms-unit">A</span></span>
-                    </div>
-                    <div class="bms-data-item">
-                        <span class="bms-label">电池组最高温度</span>
-                        <span class="bms-value"><span id="bms-max-temp">--</span><span class="bms-unit">°C</span></span>
-                    </div>
-                    <div class="bms-data-item">
-                        <span class="bms-label">电池组最低温度</span>
-                        <span class="bms-value"><span id="bms-min-temp">--</span><span class="bms-unit">°C</span></span>
-                    </div>
-                    <div class="bms-data-item">
-                        <span class="bms-label">预估剩余时间</span>
-                        <span class="bms-value"><span id="bms-remain-time">--</span><span class="bms-unit">min</span></span>
                     </div>
                 </div>
                 <div class="battery-container">
