@@ -45,7 +45,7 @@ public class MqttMessageHandler implements MqttCallback {
     public void messageArrived(String topic, MqttMessage message) {
         try {
             String payload = new String(message.getPayload());
-            log.debug("收到 MQTT 消息: topic={}", topic);
+            log.info("收到 MQTT 消息: topic={} payload={}", topic, payload);
 
             if (topic.matches("charging/station/\\d+/pile/\\d+/gun/\\d+/data")) {
                 handleChargingData(topic, payload);

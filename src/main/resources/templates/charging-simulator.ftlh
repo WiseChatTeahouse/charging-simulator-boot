@@ -187,34 +187,32 @@
         
         .bms-container {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             justify-content: flex-start;
             background: #0f3460;
-            padding: 30px 20px;
+            padding: 20px;
             border-radius: 12px;
-            min-height: 280px;
+            gap: 20px;
         }
         
         .bms-left {
-            flex: 0 0 auto;
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            min-width: 180px;
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
         }
         
-        .bms-data-item { display: flex; flex-direction: column; gap: 8px; }
-        .bms-label { color: #aaa; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
-        .bms-value { font-size: 24px; font-weight: bold; color: #00d4ff; }
-        .bms-unit { font-size: 14px; color: #aaa; margin-left: 4px; }
+        .bms-data-item { display: flex; flex-direction: column; gap: 4px; }
+        .bms-label { color: #aaa; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
+        .bms-value { font-size: 18px; font-weight: bold; color: #00d4ff; }
+        .bms-unit { font-size: 12px; color: #aaa; margin-left: 3px; }
         
         .battery-container {
-            flex: 1;
+            flex: 0 0 auto;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            margin-left: 60px;
         }
         
         .battery-pole {
@@ -453,20 +451,36 @@
             <div id="bms-data" class="bms-container">
                 <div class="bms-left">
                     <div class="bms-data-item">
-                        <span class="bms-label">电池电压</span>
-                        <span class="bms-value"><span id="battery-voltage">--</span><span class="bms-unit">V</span></span>
+                        <span class="bms-label">需求电压</span>
+                        <span class="bms-value"><span id="bms-r-vol">--</span><span class="bms-unit">V</span></span>
                     </div>
                     <div class="bms-data-item">
-                        <span class="bms-label">电池电流</span>
-                        <span class="bms-value"><span id="battery-current">--</span><span class="bms-unit">A</span></span>
-                    </div>
-                    <div class="bms-data-item">
-                        <span class="bms-label">电池温度</span>
-                        <span class="bms-value"><span id="battery-temp">--</span><span class="bms-unit">°C</span></span>
+                        <span class="bms-label">需求电流</span>
+                        <span class="bms-value"><span id="bms-r-cur">--</span><span class="bms-unit">A</span></span>
                     </div>
                     <div class="bms-data-item">
                         <span class="bms-label">SOC</span>
                         <span class="bms-value"><span id="battery-soc">--</span><span class="bms-unit">%</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">测量电压</span>
+                        <span class="bms-value"><span id="bms-m-vol">--</span><span class="bms-unit">V</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">测量电流</span>
+                        <span class="bms-value"><span id="bms-m-cur">--</span><span class="bms-unit">A</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">电池组最高温度</span>
+                        <span class="bms-value"><span id="bms-max-temp">--</span><span class="bms-unit">°C</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">电池组最低温度</span>
+                        <span class="bms-value"><span id="bms-min-temp">--</span><span class="bms-unit">°C</span></span>
+                    </div>
+                    <div class="bms-data-item">
+                        <span class="bms-label">预估剩余时间</span>
+                        <span class="bms-value"><span id="bms-remain-time">--</span><span class="bms-unit">min</span></span>
                     </div>
                 </div>
                 <div class="battery-container">
@@ -723,7 +737,8 @@
         function resetDataDisplay() {
             if (chargingDataTimer) { clearTimeout(chargingDataTimer); chargingDataTimer = null; }
             if (bmsDataTimer) { clearTimeout(bmsDataTimer); bmsDataTimer = null; }
-            ['voltage','current','power','soc','battery-voltage','battery-current','battery-temp','battery-soc'].forEach(id => {
+            ['voltage','current','power','soc','battery-soc','bms-m-vol','bms-m-cur','bms-r-vol','bms-r-cur',
+             'bms-max-temp','bms-min-temp','bms-remain-time'].forEach(id => {
                 document.getElementById(id).textContent = '--';
             });
         }
@@ -764,15 +779,22 @@
         
         function updateBmsData(data) {
             if (bmsDataTimer) clearTimeout(bmsDataTimer);
-            if (data.batteryVoltage != null) document.getElementById('battery-voltage').textContent = data.batteryVoltage.toFixed(1);
-            if (data.batteryCurrent != null) document.getElementById('battery-current').textContent = data.batteryCurrent.toFixed(1);
-            if (data.batteryTemp != null) document.getElementById('battery-temp').textContent = data.batteryTemp.toFixed(1);
             if (data.soc != null) {
                 document.getElementById('battery-soc').textContent = data.soc;
                 updateBatteryAnimation(data.soc);
             }
+            if (data.mVol != null) document.getElementById('bms-m-vol').textContent = Math.abs(data.mVol);
+            if (data.mCur != null) document.getElementById('bms-m-cur').textContent = Math.abs(data.mCur);
+            if (data.rVol != null) document.getElementById('bms-r-vol').textContent = Math.abs(data.rVol);
+            if (data.rCur != null) document.getElementById('bms-r-cur').textContent = Math.abs(data.rCur);
+            if (data.maxTemp != null) document.getElementById('bms-max-temp').textContent = data.maxTemp;
+            if (data.minTemp != null) document.getElementById('bms-min-temp').textContent = data.minTemp;
+            if (data.remainTime != null) document.getElementById('bms-remain-time').textContent = data.remainTime;
             bmsDataTimer = setTimeout(() => {
-                ['battery-voltage','battery-current','battery-temp','battery-soc'].forEach(id => document.getElementById(id).textContent = '--');
+                ['battery-soc','bms-m-vol','bms-m-cur','bms-r-vol','bms-r-cur',
+                 'bms-max-temp','bms-min-temp','bms-remain-time'].forEach(id => {
+                    document.getElementById(id).textContent = '--';
+                });
                 document.getElementById('battery-percentage').textContent = '--';
                 document.getElementById('battery-level').style.height = '0%';
             }, DATA_TIMEOUT);

@@ -1,9 +1,7 @@
 package chat.wisechat.charging.vo;
 
+import com.alibaba.fastjson2.annotation.JSONField;
 import lombok.Data;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 /**
  * 车辆 BMS 数据 VO
@@ -13,14 +11,40 @@ import java.time.LocalDateTime;
  */
 @Data
 public class VehicleBmsDataVO {
-    
-    private BigDecimal batteryVoltage;
-    
-    private BigDecimal batteryCurrent;
-    
-    private BigDecimal batteryTemp;
-    
+
+    private Integer cif;
+
+    private String msg;
+
     private Integer soc;
-    
-    private LocalDateTime timestamp;
+
+    private Integer mode;
+
+    @JSONField(name = "mCur")
+    private Double mCur;
+
+    @JSONField(name = "mVol")
+    private Double mVol;
+
+    @JSONField(name = "rCur")
+    private Double rCur;
+
+    @JSONField(name = "rVol")
+    private Double rVol;
+
+    @JSONField(name = "sCur")
+    private Double sCur;
+
+    @JSONField(name = "sVol")
+    private Double sVol;
+
+    private Integer maxTemp;
+
+    private Integer minTemp;
+
+    private Long tradeID;
+
+    private Double cellMaxVol;
+
+    private Integer remainTime;
 }

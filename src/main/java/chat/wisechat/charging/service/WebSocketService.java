@@ -78,8 +78,30 @@ public class WebSocketService {
 
     public void buildPushMsg(Long gunId, EmulatorMessage msg) {
         WebSocketMessage message = new WebSocketMessage();
-        message.setType(ChargingPayloadType.getMessagePayload(msg.getType()));
-        message.setData(msg.getPayload());
+        String messageType = ChargingPayloadType.getMessagePayload(msg.getType());
+        message.setType(messageType);
+        if ("BMS_DATA".equals(messageType)) {
+            com.alibaba.fastjson2.JSONObject raw = JSON.parseObject(msg.getPayload());
+            VehicleBmsDataVO bmsData = new VehicleBmsDataVO();
+            bmsData.setCif(raw.getInteger("cif"));
+            bmsData.setMsg(raw.getString("msg"));
+            bmsData.setSoc(raw.getInteger("soc"));
+            bmsData.setMode(raw.getInteger("mode"));
+            bmsData.setMCur(raw.getDouble("m_cur"));
+            bmsData.setMVol(raw.getDouble("m_vol"));
+            bmsData.setRCur(raw.getDouble("r_cur"));
+            bmsData.setRVol(raw.getDouble("r_vol"));
+            bmsData.setSCur(raw.getDouble("s_cur"));
+            bmsData.setSVol(raw.getDouble("s_vol"));
+            bmsData.setMaxTemp(raw.getInteger("maxTemp"));
+            bmsData.setMinTemp(raw.getInteger("minTemp"));
+            bmsData.setTradeID(raw.getLong("tradeID"));
+            bmsData.setCellMaxVol(raw.getDouble("cellMaxVol"));
+            bmsData.setRemainTime(raw.getInteger("remainTime"));
+            message.setData(bmsData);
+        } else {
+            message.setData(msg.getPayload());
+        }
         pushMessage(gunId, message);
     }
 
